@@ -79,7 +79,7 @@
 <!-- Size option -->
 <div>
     <label><input type="checkbox" id="size_option"> Enable size</label><br>
-    <label><input type="checkbox" id="spliti_option"> Enable spliti</label><br>
+    <label><input type="checkbox" id="spliti_option"> Enable split by index</label><br>
 </div>
 <hr>
 
@@ -170,16 +170,20 @@
         ["range_update_key", "lazy_prop"],
         ["range_update_key", "merge_option"],
         ["range_update_key", "key_type"],
+        ["range_update_key", "split_option"],
         ["range_update_index", "lazy_prop"],
         ["range_update_index", "merge_option"],
         ["range_update_index", "size_option"],
+        ["range_update_index", "spliti_option"],
         ["range_sum", "size_option"],
         ["range_query_key", "lazy_prop"],
         ["range_query_key", "merge_option"],
         ["range_query_key", "key_type"],
+        ["range_query_key", "split_option"],
         ["range_query_index", "lazy_prop"],
         ["range_query_index", "merge_option"],
         ["range_query_index", "size_option"],
+        ["range_query_index", "spliti_option"],
         ["range_agg", "val_type"],
         ["range_sum", "range_agg"],
         ["range_max", "range_agg"],
@@ -348,6 +352,9 @@
         if (range_update_key || range_update_index || range_query_key || range_update_index) {
             addWarning("The implementation of range operations has quite a high constant factor. Beware of TLE on tight time limits.")
         }
+        if (range_sum && val_type !== 'long long') {
+            addWarning("Be careful for overflows when using range sum with integers.")
+        }
     }
 
     function displayWarnings() {
@@ -399,7 +406,7 @@
     function updateCodeDisplay() {
         let code = "";
 
-        let inf = (val_type === 'int' ? '1e9' : '1e18')
+        let inf = (val_type === 'int' ? '1\'000\'000\'000' : '1\'000\'000\'000\'000\'000\'000')
         let enable_par = false;
         let enable_value = val_type !== 'none'
         let pull = size_option || range_sum || range_max || range_min;
@@ -423,7 +430,7 @@
             let lazy_id = [];
             if (range_add || range_set) lazy_id.push("0");
             if (range_set) lazy_id.push("true");
-            code += `const Lazy lid = {${lazy_id.join(", ")}}\n\n`;
+            code += `const Lazy lid = {${lazy_id.join(", ")}};\n\n`;
         }
 
         if (enable_value) {
@@ -434,10 +441,18 @@
             code += "\n";
             if (lazy_prop) {
                 code += '    void upd(Lazy lazy, int sz) {\n'
-                if (range_set) code += '        if (!lazy.inc) sum = mx = mn = 0;\n'
-                if (range_sum || range_set) code += '        sum += lazy.val * sz;\n'
-                if (range_max) code += '        mx += lazy.val;\n'
-                if (range_min) code += '        mn += lazy.val;\n'
+                if (range_set) {
+                    items = []
+                    if (range_sum) items.push("sum = ")
+                    if (range_max) items.push("mx = ")
+                    if (range_min) items.push("mn = ")
+                    if (items.length > 0) code += `        if (!lazy.inc) ${items.join('')}0;\n`
+                }
+                if (range_add || range_set) {
+                    if (range_sum) code += '        sum += lazy.val * sz;\n'
+                    if (range_max) code += '        mx += lazy.val;\n'
+                    if (range_min) code += '        mn += lazy.val;\n'
+                }
                 code += '    }\n'
                 code += "\n";
             }
@@ -456,7 +471,7 @@
             if (range_sum) val_id.push("0")
             if (range_max) val_id.push(`-${inf}`)
             if (range_min) val_id.push(`${inf}`)
-            code += `const Value vid = {${val_id.join(", ")}}\n\n`;
+            code += `const Value vid = {${val_id.join(", ")}};\n\n`;
         }
 
         code += "std::mt19937 mt(std::chrono::steady_clock::now().time_since_epoch().count());\n" +
@@ -486,6 +501,20 @@
             params.push('Value val')
             bruh.push('val(val), agg(val)')
         }
+
+        // default constructor
+        if (params.length > 0) {
+            code += '    Node() {\n'    
+            code += '        pri = mt();\n'
+            if (enable_value) code += '        val = vid;\n'
+            if (range_agg) code += '        agg = vid;\n'
+            if (lazy_prop) code += '        lazy = lid;\n'
+            if (size_option) code += '        sz = 1;\n'
+            code += '        l = r = nullptr;\n'
+            if (enable_par) code += '        par = nullptr;\n'
+            code += '    }\n\n'
+        }
+
         let param_str = params.join(", ")
         let bruh_str = ''
         if (bruh.length > 0) bruh_str += ' : '
@@ -498,10 +527,8 @@
         if (enable_par) code += '        par = nullptr;\n'
         code += '    }\n'
 
+        code += "};\n\n"
 
-        code += "};\n"
-
-        code += '\n'
         if (size_option) code += 'int sz(ptr n) { return n ? n->sz : 0; };\n'
         if (range_agg) code += 'Value agg(ptr n) { return n ? n->agg : vid; }\n'
         code += '\n'
@@ -578,7 +605,7 @@
 
         if (range_update_key) {
             code += `void upd(ptr& n, ${key_type} lo, ${key_type} hi, Lazy lazy) {\n` +
-                `    auto [lm, r] = split(n, ${range_type === 'inc exc' ? 'hi' : 'hi - 1'});\n` +
+                `    auto [lm, r] = split(n, ${range_type === 'inc exc' ? 'hi' : 'hi + 1'});\n` +
                 '    auto [l, m] = split(lm, lo);\n' +
                 '    if (m) m->lazy += lazy;\n' +
                 '    n = merge(l, merge(m, r));\n' +
@@ -587,7 +614,7 @@
 
         if (range_update_index) {
             code += 'void updi(ptr& n, int lo, int hi, Lazy lazy) {\n' +
-                `    auto [lm, r] = spliti(n, ${range_type === 'inc exc' ? 'hi' : 'hi - 1'});\n` +
+                `    auto [lm, r] = spliti(n, ${range_type === 'inc exc' ? 'hi' : 'hi + 1'});\n` +
                 '    auto [l, m] = spliti(lm, lo);\n' +
                 '    if (m) m->lazy += lazy;\n' +
                 '    n = merge(l, merge(m, r));\n' +
@@ -596,7 +623,7 @@
 
         if (range_query_key) {
             code += `Value query(ptr& n, ${key_type} lo, ${key_type} hi) {\n` +
-                `    auto [lm, r] = split(n, ${range_type === 'inc exc' ? 'hi' : 'hi - 1'});\n` +
+                `    auto [lm, r] = split(n, ${range_type === 'inc exc' ? 'hi' : 'hi + 1'});\n` +
                 '    auto [l, m] = split(lm, lo);\n' +
                 '    Value res = agg(m);\n' +
                 '    n = merge(l, merge(m, r));\n' +
@@ -606,7 +633,7 @@
 
         if (range_query_index) {
             code += 'Value queryi(ptr& n, int lo, int hi) {\n' +
-                `    auto [lm, r] = spliti(n, ${range_type === 'inc exc' ? 'hi' : 'hi - 1'});\n` +
+                `    auto [lm, r] = spliti(n, ${range_type === 'inc exc' ? 'hi' : 'hi + 1'});\n` +
                 '    auto [l, m] = spliti(lm, lo);\n' +
                 '    Value res = agg(m);\n' +
                 '    n = merge(l, merge(m, r));\n' +
