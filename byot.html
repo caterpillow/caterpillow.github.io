@@ -64,7 +64,7 @@
 <!-- Merge option -->
 <div>
     <label><input type="checkbox" id="merge_option"> Enable merge</label><br>
-    <label><input type="checkbox" id="three_merge_option"> Enable 3-way merge</label><br>
+    <label><input type="checkbox" id="n_merge_option"> Enable n-way merge</label><br>
 </div>
 <hr>
 
@@ -79,8 +79,10 @@
     </select>
     <br>
     <label><input type="checkbox" id="split_option"> Enable split</label><br>
+    <label><input type="checkbox" id="three_split_option"> Enable 3-way split</label><br>
     <label><input type="checkbox" id="find_option"> Enable find</label><br>
     <label><input type="checkbox" id="ins_option"> Enable point insert</label><br>
+    <label><input type="checkbox" id="del_option"> Enable point deletion</label><br>
 </div>
 <hr>
 
@@ -88,7 +90,9 @@
 <div>
     <label><input type="checkbox" id="size_option"> Enable size</label><br>
     <label><input type="checkbox" id="spliti_option"> Enable split by index</label><br>
+    <label><input type="checkbox" id="three_spliti_option"> Enable 3-way split by index</label><br>
     <label><input type="checkbox" id="insi_option"> Enable point insert by index</label><br>
+    <label><input type="checkbox" id="deli_option"> Enable point deletion by index</label><br>
 </div>
 <hr>
 
@@ -170,14 +174,18 @@
     let use_namespace_std = false;
     let use_ll_typedef = false;
     let merge_option = false;
-    let three_merge_option = false;
+    let n_merge_option = false;
     let key_type = 'none';
     let split_option = false;
+    let three_split_option = false;
     let find_option = false;
     let ins_option = false;
+    let del_option = false;
     let size_option = false;
     let spliti_option = false;
+    let three_spliti_option = false;
     let insi_option = false;
+    let deli_option = false;
     let min_option = false;
     let max_option = false;
     let unite_option = false;
@@ -234,7 +242,7 @@
         ["range_max", "range_agg"],
         ["range_min", "range_agg"],
         ["lazy_prop", "range_agg"],
-        ["three_merge_option", "merge_option"],
+        ["n_merge_option", "merge_option"],
         ["order_option", "par_option"],
         ["order_option", "size_option"],
         ["clean_option", "par_option"],
@@ -244,7 +252,12 @@
         ["unite_option", "min_option"],
         ["unite_fast_option", "split_option"],
         ["build_option", "heapify_option"],
-        ["range_reverse", "lazy_prop"]
+        ["range_reverse", "lazy_prop"],
+        ["del_option", "merge_option"],
+        ["deli_option", "merge_option"],
+        ["deli_option", "size_option"],
+        ["three_split_option", "split_option"],
+        ["three_spliti_option", "spliti_option"]
     ];
 
     const sortedDependencies = topsort(edges);
@@ -366,14 +379,18 @@
         use_namespace_std = document.getElementById("use_namespace_std").checked;
         use_ll_typedef = document.getElementById("use_ll_typedef").checked;
         merge_option = document.getElementById("merge_option").checked;
-        three_merge_option = document.getElementById("three_merge_option").checked;
+        n_merge_option = document.getElementById("n_merge_option").checked;
         key_type = document.getElementById("key_type").value;
         split_option = document.getElementById("split_option").checked;
+        three_split_option = document.getElementById("three_split_option").checked;
         find_option = document.getElementById("find_option").checked;
         ins_option = document.getElementById("ins_option").checked;
+        del_option = document.getElementById("del_option").checked;
         size_option = document.getElementById("size_option").checked;
         spliti_option = document.getElementById("spliti_option").checked;
+        three_spliti_option = document.getElementById("three_spliti_option").checked;
         insi_option = document.getElementById("insi_option").checked;
+        deli_option = document.getElementById("deli_option").checked;
         max_option = document.getElementById("max_option").checked;
         min_option = document.getElementById("min_option").checked;
         unite_option = document.getElementById("unite_option").checked;
@@ -656,6 +673,15 @@
                 '}\n\n'
         }
 
+        if (three_split_option) {
+            if (comments) code += `// cuts out [lo, hi${incexc ? ')' : ']'}\n`
+            code += `tuple<ptr, ptr, ptr> split(ptr n, ${key_type} lo, ${key_type} hi) {\n` +
+                `    auto [lm, r] = split(n, hi${incexc ? '' : ' + 1'});\n` +
+                '    auto [l, m] = split(lm, lo);\n' +
+                '    return {l, m, r};\n' +
+                '}\n\n'
+        }
+
         if (find_option) {
             code += 'bool find(ptr n, ${key_type} k) {\n' +
                 '    if (!n) return false;\n' +
@@ -681,6 +707,17 @@
                 '}\n\n'
         }
 
+        if (del_option) {
+            code += 'ptr del(ptr n, ${key_type} k) {\n' +
+                '    if (!n) return nullptr;\n'
+            if (push) code += '    push(n);\n'
+            code += '    if (n->key == k) return merge(n->l, n->r);\n' +
+                '    if (k <= n->key) n->l = del(n->l, k);\n' +
+                '    else n->r = del(n->r, k);\n' +
+                `    return ${pull ? 'pull(n)' : 'n'};\n` +
+                '}\n\n'
+        }
+
         if (spliti_option) {
             if (comments) code += '// [-inf, i) and [i, inf]\n'
             code += 'std::pair<ptr, ptr> spliti(ptr n, int i) {\n' +
@@ -696,6 +733,15 @@
                 '        n->r = l;\n' +
                 '        return {pull(n), r};\n' +
                 '    }\n' +
+                '}\n\n'
+        }
+
+        if (three_spliti_option) {
+            if (comments) code += `// cuts out [lo, hi${incexc ? ')' : ']'}\n`
+            code += 'tuple<ptr, ptr, ptr> spliti(ptr n, int lo, int hi) {\n' +
+                `    auto [lm, r] = spliti(n, hi${incexc ? '' : ' + 1'});\n` +
+                '    auto [l, m] = spliti(lm, lo);\n' +
+                '    return {l, m, r};\n' +
                 '}\n\n'
         }
 
@@ -715,17 +761,30 @@
                 '}\n\n'
         }
 
+        if (deli_option) {
+            code += 'ptr deli(ptr n, int i) {\n' +
+                '    if (!n) return nullptr;\n'
+            if (push) code += '    push(n);\n'
+            code += '    if (i == sz(n->l)) return merge(n->l, n->r);\n' +
+                '    if (i <= sz(n->l)) n->l = deli(n->l, i);\n' +
+                '    else n->r = deli(n->r, i - 1 - sz(n->l));\n' +
+                `    return ${pull ? 'pull(n)' : 'n'};\n` +
+                '}\n\n'
+        }
+
         if (min_option) {
             code += 'ptr mn(ptr n) {\n' +
-                '    if (!n) return nullptr;\n' +
-                '    return max(n, mn(n->l));\n' +
+                '    if (!n) return nullptr;\n'
+            if (push) code += '    push(n);\n'
+            code += '    return max(n, mn(n->l));\n' +
                 '}\n\n'
         }
 
         if (max_option) {
             code += 'ptr mx(ptr n) {\n' +
-                '    if (!n) return nullptr;\n' +
-                '    return max(n, mn(n->r));\n' +
+                '    if (!n) return nullptr;\n'
+            if (push) code += '    push(n);\n'
+            code += '    return max(n, mn(n->r));\n' +
                 '}\n\n'
         }
 
@@ -733,10 +792,10 @@
             if (comments) code += '// proof of complexity: https://codeforces.com/blog/entry/108601\n';
             code += 'ptr unite(ptr l, ptr r) {\n' +
                 '    if (!l || !r) return l ? l : r;\n' +
-                '    if (mn(l) > mn(r)) swap(l, r);\n' +
+                '    if (mn(l)->key > mn(r)->key) swap(l, r);\n' +
                 '    ptr res = 0;\n' +
                 '    while (r) {\n' +
-                '        auto [lt, rt] = split(l, mn(r) + 1);\n' +
+                '        auto [lt, rt] = split(l, mn(r)->key + 1);\n' +
                 '        res = merge(res, lt);\n' +
                 '        tie(l, r) = make_pair(r, rt);\n' +
                 '    }\n' +
@@ -747,8 +806,9 @@
         if (unite_fast_option) {
             if (comments) code += '// fast in practice (i think?)'
             coder += 'ptr unite_fast(ptr l, ptr r) {\n' +
-                '    if (!l || !r) return l ? l : r;\n' +
-                '    if (l->pri < r->pri) swap(l, r);\n' +
+                '    if (!l || !r) return l ? l : r;\n'
+            if (push) code += '    push(l), push(r);\n'
+            code += '    if (l->pri < r->pri) swap(l, r);\n' +
                 '    auto [lhs, rhs] = split(r, l->key);\n' +
                 '    l->l = unite(l->l, lhs);\n' +
                 '    l->r = unite(l->r, rhs);\n' +
@@ -765,9 +825,10 @@
                 '}\n\n'
         }
 
-        if (three_merge_option) {
-            code += 'ptr merge(ptr l, ptr m, ptr r) {\n' +
-                    '    return merge(l, merge(m, r));\n' +
+        if (n_merge_option) {
+            code += 'template<class... Args>\n' +
+                'ptr merge(ptr l, ptr r, Args... args) {\n' +
+                '    return merge(merge(l, r), args...);\n' +
                 '}\n\n'
         }
 
@@ -844,15 +905,15 @@
         }
 
         if (build_option) {
-            code += 'ptr build(std::vector<ptr>& ns, int l = 0, int r = -1) {\n' +
-                '    if (r == -1) r = ((int) ns.size()) - 1;\n' +
+            code += 'ptr build(vector<ptr>& ns, int l = 0, int r = -69) {\n' +
+                '    if (r == -69) r = (int) ns.size() - 1;\n' +
                 '    if (l > r) return nullptr;\n' +
                 '    if (l == r) return ns[l];\n' +
-                '    int m = (r + l) / 2;\n' +
+                '    int m = (l + r) / 2;\n' +
                 '    ns[m]->l = build(ns, l, m - 1);\n' +
                 '    ns[m]->r = build(ns, m + 1, r);\n' +
                 '    heapify(ns[m]);\n' +
-                '    return pull(ns[m]);\n' +
+                `    return ${pull ? 'pull(ns[m])' : 'ns[m]'};\n` +
                 '}\n\n'
         }
 
@@ -867,6 +928,7 @@
 
         if (use_namespace_std) code = code.replaceAll("std::", "");
         if (use_ll_typedef) code = code.replaceAll("long long", "ll");
+        if (template) code = code.replaceAll("using ll = ll;", "using ll = long long;")
         const tab_character = getTabCharacter();
         code = code.replace(/ {4}/g, tab_character);
         document.getElementById("code_display").textContent = code;
