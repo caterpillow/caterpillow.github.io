@@ -550,8 +550,8 @@
             code += `    Value operator+(const Value& oth) const {\n` +
                 "        Value res {};\n";
             if (range_sum) code += "        res.sum = sum + oth.sum;\n";
-            if (range_max) code += "        res.mx = max(mx, oth.mx);\n";
-            if (range_min) code += "        res.mn = min(mn, oth.mn);\n";
+            if (range_max) code += "        res.mx = std::max(mx, oth.mx);\n";
+            if (range_min) code += "        res.mn = std::min(mn, oth.mn);\n";
             code += "        return res;\n" +
                 "    }\n" +
                 "};\n\n";
@@ -633,7 +633,7 @@
             if (lazy_prop) {
                 code += `    n->val.upd(n->lazy${size_option ? ', 1' : ''});\n` +
                     `    n->agg.upd(n->lazy${size_option ? ', sz(n)' : ''});\n`
-                if (range_reverse) code += '    swap(n->l, n->r);\n'
+                if (range_reverse) code += '    std::swap(n->l, n->r);\n'
                 code += "    if (n->l) n->l->lazy += n->lazy;\n" +
                     "    if (n->r) n->r->lazy += n->lazy;\n" +
                     "    n->lazy = lid;\n"
@@ -675,7 +675,7 @@
 
         if (three_split_option) {
             if (comments) code += `// cuts out [lo, hi${incexc ? ')' : ']'}\n`
-            code += `tuple<ptr, ptr, ptr> split(ptr n, ${key_type} lo, ${key_type} hi) {\n` +
+            code += `std::tuple<ptr, ptr, ptr> split(ptr n, ${key_type} lo, ${key_type} hi) {\n` +
                 `    auto [lm, r] = split(n, hi${incexc ? '' : ' + 1'});\n` +
                 '    auto [l, m] = split(lm, lo);\n' +
                 '    return {l, m, r};\n' +
@@ -738,7 +738,7 @@
 
         if (three_spliti_option) {
             if (comments) code += `// cuts out [lo, hi${incexc ? ')' : ']'}\n`
-            code += 'tuple<ptr, ptr, ptr> spliti(ptr n, int lo, int hi) {\n' +
+            code += 'std::tuple<ptr, ptr, ptr> spliti(ptr n, int lo, int hi) {\n' +
                 `    auto [lm, r] = spliti(n, hi${incexc ? '' : ' + 1'});\n` +
                 '    auto [l, m] = spliti(lm, lo);\n' +
                 '    return {l, m, r};\n' +
@@ -776,7 +776,7 @@
             code += 'ptr mn(ptr n) {\n' +
                 '    if (!n) return nullptr;\n'
             if (push) code += '    push(n);\n'
-            code += '    return max(n, mn(n->l));\n' +
+            code += '    return std::max(n, mn(n->l));\n' +
                 '}\n\n'
         }
 
@@ -784,7 +784,7 @@
             code += 'ptr mx(ptr n) {\n' +
                 '    if (!n) return nullptr;\n'
             if (push) code += '    push(n);\n'
-            code += '    return max(n, mn(n->r));\n' +
+            code += '    return std::max(n, mn(n->r));\n' +
                 '}\n\n'
         }
 
@@ -792,7 +792,7 @@
             if (comments) code += '// proof of complexity: https://codeforces.com/blog/entry/108601\n';
             code += 'ptr unite(ptr l, ptr r) {\n' +
                 '    if (!l || !r) return l ? l : r;\n' +
-                '    if (mn(l)->key > mn(r)->key) swap(l, r);\n' +
+                '    if (mn(l)->key > mn(r)->key) std::swap(l, r);\n' +
                 '    ptr res = 0;\n' +
                 '    while (r) {\n' +
                 '        auto [lt, rt] = split(l, mn(r)->key + 1);\n' +
@@ -808,7 +808,7 @@
             coder += 'ptr unite_fast(ptr l, ptr r) {\n' +
                 '    if (!l || !r) return l ? l : r;\n'
             if (push) code += '    push(l), push(r);\n'
-            code += '    if (l->pri < r->pri) swap(l, r);\n' +
+            code += '    if (l->pri < r->pri) std::swap(l, r);\n' +
                 '    auto [lhs, rhs] = split(r, l->key);\n' +
                 '    l->l = unite(l->l, lhs);\n' +
                 '    l->r = unite(l->r, rhs);\n' +
@@ -900,12 +900,12 @@
                 '    ptr mx = n;\n' +
                 '    if (n->l && n->l->pri > mx->pri) mx = n->l;\n' +
                 '    if (n->r && n->r->pri > mx->pri) mx = n->r;\n' +
-                '    if (mx != n) swap(n->pri, mx->pri), heapify(mx);\n' +
+                '    if (mx != n) std::swap(n->pri, mx->pri), heapify(mx);\n' +
                 '}\n\n'
         }
 
         if (build_option) {
-            code += 'ptr build(vector<ptr>& ns, int l = 0, int r = -69) {\n' +
+            code += 'ptr build(std::vector<ptr>& ns, int l = 0, int r = -69) {\n' +
                 '    if (r == -69) r = (int) ns.size() - 1;\n' +
                 '    if (l > r) return nullptr;\n' +
                 '    if (l == r) return ns[l];\n' +
