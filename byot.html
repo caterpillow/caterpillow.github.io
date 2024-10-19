@@ -19,12 +19,15 @@
     Usage: click on stuff u want, don't click on stuff you don't want. <br>
     You can right click a disabled checkbox/dropdown to enable all its prerequisites. <br>
     Very high chance of bugs so pls tell if you find any (no refunds for potential lost codeforces rating). <br>
+    If you find a way of better implementing certain operations, pls make a pull request.<br>
 </div>
 <hr>
 
-<!-- Shameless promotion -->
+<!-- Misc -->
 <div>
-    <label><input type="checkbox" id="signature" checked> Show site tag</label><br>
+    <label><input type="checkbox" id="signature" checked> Include site tag (pls)</label><br>
+    <label><input type="checkbox" id="comments" checked> Enable comments</label><br>
+    <label><input type="checkbox" id="template"> Template mode (for testing)</label><br>
 </div>
 <hr>
 
@@ -42,6 +45,7 @@
         <option value="2spaces">2 spaces</option>
         <option value="3spaces">3 spaces</option>
         <option value="4spaces" selected>4 spaces</option>
+        <option value="8spaces">8 spaces (wtf)</option>
         <option value="tab">Tab</option>
     </select>
 </div>
@@ -60,6 +64,7 @@
 <!-- Merge option -->
 <div>
     <label><input type="checkbox" id="merge_option"> Enable merge</label><br>
+    <label><input type="checkbox" id="three_merge_option"> Enable 3-way merge</label><br>
 </div>
 <hr>
 
@@ -73,13 +78,27 @@
     </select>
     <br>
     <label><input type="checkbox" id="split_option"> Enable split</label><br>
+    <label><input type="checkbox" id="find_option"> Enable find (untested)</label><br>
+    <label><input type="checkbox" id="ins_option"> Enable point insert (untested)</label><br>
 </div>
 <hr>
 
 <!-- Size option -->
 <div>
     <label><input type="checkbox" id="size_option"> Enable size</label><br>
-    <label><input type="checkbox" id="spliti_option"> Enable split by index</label><br>
+    <label><input type="checkbox" id="spliti_option"> Enable split by index (untested)</label><br>
+    <label><input type="checkbox" id="insi_option"> Enable point insert by index (untested)</label><br>
+</div>
+<hr>
+
+<!-- More misc -->
+<div>
+    <label><input type="checkbox" id="max_option"> Enable max</label><br>
+    <label><input type="checkbox" id="min_option"> Enable min</label><br>
+    <label><input type="checkbox" id="unite_option"> Enable treap union (amortization)</label><br>
+    <label><input type="checkbox" id="unite_fast_option"> Enable treap union (brute)</label><br>
+    <label><input type="checkbox" id="heapify_option"> Enable heapify</label><br>
+    <label><input type="checkbox" id="build_option"> Enable build</label><br>
 </div>
 <hr>
 
@@ -106,8 +125,9 @@
 <!-- Lazy propagation -->
 <div>
     <label><input type="checkbox" id="lazy_prop"> Enable lazy propagation</label><br>
-    <label><input type="checkbox" id="range_add"> Enable range add</label><br>
-    <label><input type="checkbox" id="range_set"> Enable range set</label><br>
+    <label><input type="checkbox" id="range_reverse"> Support range reverse</label><br>
+    <label><input type="checkbox" id="range_add"> Support range add</label><br>
+    <label><input type="checkbox" id="range_set"> Support range set</label><br>
 </div>
 <hr>
 
@@ -122,6 +142,14 @@
 <div>
     <label><input type="checkbox" id="range_query_key"> Enable range queries (key)</label><br>
     <label><input type="checkbox" id="range_query_index"> Enable range queries (index)</label><br>
+</div>
+<hr>
+
+<!-- Parent pointer stuff -->
+<div>
+    <label><input type="checkbox" id="par_option"> Enable parent pointers</label><br>
+    <label><input type="checkbox" id="clean_option"> Enable clean (given a pointer to a node, flushes all lazy tags)</label><br>
+    <label><input type="checkbox" id="order_option"> Enable order (finds index of a node)</label><br>
 </div>
 <hr>
 
@@ -141,14 +169,23 @@
     let use_namespace_std = false;
     let use_ll_typedef = false;
     let merge_option = false;
+    let three_merge_option = false;
     let key_type = 'none';
     let split_option = false;
+    let find_option = false;
+    let ins_option = false;
     let size_option = false;
     let spliti_option = false;
+    let insi_option = false;
+    let min_option = false;
+    let max_option = false;
+    let unite_option = false;
+    let unite_fast_option = false;
     let range_sum = false;
     let range_max = false;
     let range_min = false;
     let lazy_prop = false;
+    let range_reverse = false;
     let range_add = false;
     let range_set = false;
     let range_update_key = false;
@@ -159,12 +196,23 @@
     let range_type = 'inc exc'
     let range_agg = false;
     let signature = true;
+    let comments = true;
+    let template = false;
+
+    let par_option = false;
+    let clean_option = false;
+    let order_option = false;
+    let heapify_option = false;
+    let build_option = false;
 
 
     // Static dependencies graph
-    const dependencyPairs = [
+    const edges = [
         ["split_option", "key_type"],
+        ["find_option", "key_type"],
+        ["ins_option", "split_option"],
         ["spliti_option", "size_option"],
+        ["insi_option", "spliti_option"],
         ["range_add", "lazy_prop"],
         ["range_set", "lazy_prop"],
         ["range_update_key", "lazy_prop"],
@@ -172,25 +220,33 @@
         ["range_update_key", "key_type"],
         ["range_update_key", "split_option"],
         ["range_update_index", "lazy_prop"],
-        ["range_update_index", "merge_option"],
         ["range_update_index", "size_option"],
-        ["range_update_index", "spliti_option"],
         ["range_sum", "size_option"],
         ["range_query_key", "lazy_prop"],
         ["range_query_key", "merge_option"],
         ["range_query_key", "key_type"],
         ["range_query_key", "split_option"],
         ["range_query_index", "lazy_prop"],
-        ["range_query_index", "merge_option"],
         ["range_query_index", "size_option"],
-        ["range_query_index", "spliti_option"],
         ["range_agg", "val_type"],
         ["range_sum", "range_agg"],
         ["range_max", "range_agg"],
-        ["range_min", "range_agg"]
+        ["range_min", "range_agg"],
+        ["lazy_prop", "range_agg"],
+        ["three_merge_option", "merge_option"],
+        ["order_option", "par_option"],
+        ["order_option", "size_option"],
+        ["clean_option", "par_option"],
+        ["clean_option", "lazy_prop"],
+        ["unite_option", "merge_option"],
+        ["unite_option", "split_option"],
+        ["unite_option", "min_option"],
+        ["unite_fast_option", "split_option"],
+        ["build_option", "heapify_option"],
+        ["range_reverse", "lazy_prop"]
     ];
 
-    const sortedDependencies = topsort(dependencyPairs);
+    const sortedDependencies = topsort(edges);
 
     document.addEventListener("DOMContentLoaded", () => {
         initializeForm();
@@ -217,7 +273,7 @@
 
     function applyDependencies() {
         sortedDependencies.forEach(id => {
-            const dependencies = dependencyPairs
+            const dependencies = edges
                 .filter(pair => pair[0] === id)
                 .map(pair => pair[1]);
 
@@ -241,38 +297,34 @@
     function enableDependencies(id) {
         const element = document.getElementById(id);
 
-        // Enable dependencies recursively
-        const requiredDeps = dependencyPairs.filter(pair => pair[0] === id).map(pair => pair[1]);
+        const reqs = edges.filter(pair => pair[0] === id).map(pair => pair[1]);
 
-        requiredDeps.forEach(depId => {
-            const depElement = document.getElementById(depId);
+        reqs.forEach(depId => {
+            const dep = document.getElementById(depId);
 
-            // Recursively enable the dependencies of this dependency
             enableDependencies(depId);
 
-            if (depElement.tagName === "INPUT" && depElement.type === "checkbox" && !depElement.checked) {
-                depElement.checked = true;
+            if (dep.tagName === "INPUT" && dep.type === "checkbox" && !dep.checked) {
+                dep.checked = true;
             }
 
-            if (depElement.tagName === "SELECT" && depElement.value === depElement.options[0].value) {
-                depElement.value = depElement.options[1].value; // Select second option
+            if (dep.tagName === "SELECT" && dep.value === dep.options[0].value) {
+                dep.value = dep.options[1].value;
             }
 
-            depElement.disabled = false;
+            dep.disabled = false;
         });
 
-        // Now enable the element itself
         if (element.tagName === "SELECT") {
-            element.value = element.options[1].value; // Select second option for dropdown
+            element.value = element.options[1].value;
         } else if (element.type === "checkbox") {
-            element.checked = true; // Enable checkbox
+            element.checked = true;
         }
 
-        element.disabled = false; // Ensure it's not disabled
+        element.disabled = false;
 
-        handleUpdate(); // Update the state of the page
+        handleUpdate();
     }
-
 
     function topsort(pairs) {
         let graph = {};
@@ -313,14 +365,23 @@
         use_namespace_std = document.getElementById("use_namespace_std").checked;
         use_ll_typedef = document.getElementById("use_ll_typedef").checked;
         merge_option = document.getElementById("merge_option").checked;
+        three_merge_option = document.getElementById("three_merge_option").checked;
         key_type = document.getElementById("key_type").value;
         split_option = document.getElementById("split_option").checked;
+        find_option = document.getElementById("find_option").checked;
+        ins_option = document.getElementById("ins_option").checked;
         size_option = document.getElementById("size_option").checked;
         spliti_option = document.getElementById("spliti_option").checked;
+        insi_option = document.getElementById("insi_option").checked;
+        max_option = document.getElementById("max_option").checked;
+        min_option = document.getElementById("min_option").checked;
+        unite_option = document.getElementById("unite_option").checked;
+        unite_fast_option = document.getElementById("unite_fast_option").checked;
         range_sum = document.getElementById("range_sum").checked;
         range_max = document.getElementById("range_max").checked;
         range_min = document.getElementById("range_min").checked;
         lazy_prop = document.getElementById("lazy_prop").checked;
+        range_reverse = document.getElementById("range_reverse").checked;
         range_add = document.getElementById("range_add").checked;
         range_set = document.getElementById("range_set").checked;
         range_update_key = document.getElementById("range_update_key").checked;
@@ -331,6 +392,13 @@
         range_type = document.getElementById("range_type").value;
         range_agg = document.getElementById("range_agg").checked
         signature = document.getElementById("signature").checked
+        comments = document.getElementById("comments").checked
+        template = document.getElementById("template").checked;
+        par_option = document.getElementById("par_option").checked;
+        clean_option = document.getElementById("clean_option").checked;
+        order_option = document.getElementById("order_option").checked;
+        build_option = document.getElementById("build_option").checked;
+        heapify_option = document.getElementById("heapify_option").checked;
 
         clearWarnings();
         applyDependencies();
@@ -339,29 +407,19 @@
         updateCodeDisplay();
     }
 
-    function addWarning(message) {
-        warnings.push(message);
-    }
-
-    function clearWarnings() {
-        warnings = [];
-        document.getElementById("warnings").innerHTML = "";
-    }
-
+    function addWarning(message) { warnings.push(message); }
+    function clearWarnings() { warnings = []; document.getElementById("warnings").innerHTML = ""; }
     function checkForWarnings() {
-        if (range_update_key || range_update_index || range_query_key || range_update_index) {
-            addWarning("The implementation of range operations has quite a high constant factor. Beware of TLE on tight time limits.")
+        if (range_update_key || range_query_key) {
+            addWarning("The implementation of range operations with keys has quite a high constant factor. Beware of TLE on tight time limits. Consider switching to indices if possible.")
         }
         if (range_sum && val_type !== 'long long') {
             addWarning("Be careful for overflows when using range sum with integers.")
         }
     }
-
     function displayWarnings() {
         const warningDiv = document.getElementById("warnings");
-        if (warnings.length > 0) {
-            warningDiv.innerHTML = warnings.join("<br>");
-        }
+        if (warnings.length > 0) warningDiv.innerHTML = warnings.join("<br>");
     }
 
     function copyCode() {
@@ -396,6 +454,8 @@
                 return '   '; // 3 spaces
             case '4spaces':
                 return '    '; // 4 spaces
+            case '8spaces':
+                return '        ' // 8 spaces
             case 'tab':
                 return '\t'; // Tab character
             default:
@@ -407,27 +467,36 @@
         let code = "";
 
         let inf = (val_type === 'int' ? '1\'000\'000\'000' : '1\'000\'000\'000\'000\'000\'000')
-        let enable_par = false;
         let enable_value = val_type !== 'none'
-        let pull = size_option || range_sum || range_max || range_min;
+        let pull = size_option || range_sum || range_max || range_min || par_option;
         let push = lazy_prop;
+        let incexc = range_type === 'inc exc';
 
         // start code displaying
 
+        if (template) {
+            code += "#include <bits/stdc++.h>\n\n";
+            if (use_namespace_std) code += "using namespace std;\n"
+            if (use_ll_typedef) code += "using ll = long long;\n\n"
+        }
+
         if (lazy_prop) {
             code += `struct Lazy {\n`;
+            if (range_reverse) code += '    bool rev;\n'
             if (range_add || range_set) code += `    ${val_type} val;\n`;
             if (range_set) code += "    bool inc;\n";
             code += "\n";
             code += `    void operator+=(const Lazy& oth) {\n`;
+            if (range_reverse) code += '        rev ^= oth.rev;\n'
             if (range_add || range_set) {
-                if (range_set) code += "        if (!oth.inc) val = 0, inc = 0;\n";
+                if (range_set) code += "        if (!oth.inc) val = 0, inc = false;\n";
                 code += "        val += oth.val;\n";
             }
             code += "    }\n";
             code += "};\n\n";
 
             let lazy_id = [];
+            if (range_reverse) lazy_id.push("false");
             if (range_add || range_set) lazy_id.push("0");
             if (range_set) lazy_id.push("true");
             code += `const Lazy lid = {${lazy_id.join(", ")}};\n\n`;
@@ -440,7 +509,7 @@
             if (range_min) code += `    ${val_type} mn;\n`;
             code += "\n";
             if (lazy_prop) {
-                code += '    void upd(Lazy lazy, int sz) {\n'
+                code += `    void upd(Lazy lazy${size_option ? ', int sz' : ''}) {\n`
                 if (range_set) {
                     items = []
                     if (range_sum) items.push("sum = ")
@@ -474,60 +543,62 @@
             code += `const Value vid = {${val_id.join(", ")}};\n\n`;
         }
 
-        code += "std::mt19937 mt(std::chrono::steady_clock::now().time_since_epoch().count());\n" +
-            "using ptr = struct Node*;\n\n" +
-            "struct Node {\n"
-        if (enable_value) code += "    Value val;\n";
-        if (range_agg) code += "    Value agg;\n";
-        if (lazy_prop) code += "    Lazy lazy;\n";
-        code += "\n";
-        if (key_type !== "none") code += `    ${key_type} key;\n`;
-        if (size_option) code += "    int sz;\n";
-        code += "    int pri;\n" +
-            "    ptr l, r;\n"
-        if (enable_par) code += "    ptr par;\n";
+        {
+            code += "std::mt19937 mt(std::chrono::steady_clock::now().time_since_epoch().count());\n" +
+                "using ptr = struct Node*;\n\n" +
+                "struct Node {\n"
+            if (enable_value) code += "    Value val;\n";
+            if (range_agg) code += "    Value agg;\n";
+            if (lazy_prop) code += "    Lazy lazy;\n";
+            code += "\n";
+            if (key_type !== "none") code += `    ${key_type} key;\n`;
+            if (size_option) code += "    int sz;\n";
+            code += "    int pri;\n" +
+                "    ptr l, r;\n"
+            if (par_option) code += "    ptr par;\n";
 
-        code += '\n';
+            code += '\n';
 
-        // make constructor
+            // make constructor
 
-        let params = []
-        let bruh = []
-        if (key_type !== 'none') {
-            params.push(`${key_type} key`)
-            bruh.push('key(key)')
-        }
-        if (enable_value) {
-            params.push('Value val')
-            bruh.push('val(val), agg(val)')
-        }
+            let params = []
+            let bruh = []
+            if (key_type !== 'none') {
+                params.push(`${key_type} key`)
+                bruh.push('key(key)')
+            }
+            if (enable_value) {
+                params.push('Value val')
+                bruh.push('val(val), agg(val)')
+            }
 
-        // default constructor
-        if (params.length > 0) {
-            code += '    Node() {\n'    
+            // default constructor
+            if (params.length > 0) {
+                code += '    Node() {\n'
+                code += '        pri = mt();\n'
+                if (enable_value) code += '        val = vid;\n'
+                if (range_agg) code += '        agg = vid;\n'
+                if (lazy_prop) code += '        lazy = lid;\n'
+                if (size_option) code += '        sz = 1;\n'
+                code += '        l = r = nullptr;\n'
+                if (par_option) code += '        par = nullptr;\n'
+                code += '    }\n\n'
+            }
+
+            let param_str = params.join(", ")
+            let bruh_str = ''
+            if (bruh.length > 0) bruh_str += ' : '
+            bruh_str += bruh.join(", ")
+            code += `    Node(${param_str})${bruh_str} {\n`
             code += '        pri = mt();\n'
-            if (enable_value) code += '        val = vid;\n'
-            if (range_agg) code += '        agg = vid;\n'
             if (lazy_prop) code += '        lazy = lid;\n'
             if (size_option) code += '        sz = 1;\n'
             code += '        l = r = nullptr;\n'
-            if (enable_par) code += '        par = nullptr;\n'
-            code += '    }\n\n'
+            if (par_option) code += '        par = nullptr;\n'
+            code += '    }\n'
+
+            code += "};\n\n"
         }
-
-        let param_str = params.join(", ")
-        let bruh_str = ''
-        if (bruh.length > 0) bruh_str += ' : '
-        bruh_str += bruh.join(", ")
-        code += `    Node(${param_str})${bruh_str} {\n`
-        code += '        pri = mt();\n'
-        if (lazy_prop) code += '        lazy = lid;\n'
-        if (size_option) code += '        sz = 1;\n'
-        code += '        l = r = nullptr;\n'
-        if (enable_par) code += '        par = nullptr;\n'
-        code += '    }\n'
-
-        code += "};\n\n"
 
         if (size_option) code += 'int sz(ptr n) { return n ? n->sz : 0; };\n'
         if (range_agg) code += 'Value agg(ptr n) { return n ? n->agg : vid; }\n'
@@ -537,9 +608,10 @@
             code += "void push(ptr n) {\n" +
                 "    if (!n) return;\n"
             if (lazy_prop) {
-                code += "    n->val.upd(n->lazy, 1);\n" +
-                    "    n->agg.upd(n->lazy, n->sz);\n" +
-                    "    if (n->l) n->l->lazy += n->lazy;\n" +
+                code += `    n->val.upd(n->lazy${size_option ? ', 1' : ''});\n` +
+                    `    n->agg.upd(n->lazy${size_option ? ', sz(n)' : ''});\n`
+                if (range_reverse) code += '    swap(n->l, n->r);\n'
+                code += "    if (n->l) n->l->lazy += n->lazy;\n" +
                     "    if (n->r) n->r->lazy += n->lazy;\n" +
                     "    n->lazy = lid;\n"
             }
@@ -551,7 +623,7 @@
                 '    if (!n) return nullptr;\n'
 
             if (push) code += '    push(n->l), push(n->r);\n'
-            if (enable_par) code += '    if (n->l) n->l->par = n;\n' +
+            if (par_option) code += '    if (n->l) n->l->par = n;\n' +
                 '    if (n->r) n->r->par = n;\n'
             if (size_option) code += '    n->sz = sz(n->l) + 1 + sz(n->r);\n'
             if (range_agg) code += '    n->agg = agg(n->l) + n->val + agg(n->r);\n'
@@ -561,9 +633,10 @@
         }
 
         if (split_option) {
+            if (comments) code += '// [-inf, k) and [k, inf]\n'
             code += `std::pair<ptr, ptr> split(ptr n, ${key_type} k) {\n`;
             code += '    if (!n) return {nullptr, nullptr};\n'
-            if (enable_par) code += 'n->par = nullptr;\n'
+            if (par_option) code += '    n->par = nullptr;\n'
             if (push) code += '    push(n);\n'
             code += '    if (k <= n->key) {\n' +
                 '        auto [l, r] = split(n->l, k);\n' +
@@ -577,10 +650,36 @@
                 '}\n\n'
         }
 
+        if (find_option) {
+            code += 'bool find(ptr n, ${key_type} k) {\n' +
+                '    if (!n) return false;\n' +
+                '    if (n->key == k) return true;\n' +
+                '    if (k <= n->key) return find(n->l, k);\n' +
+                '    else return find(n->r, k);\n' +
+                '}\n\n'
+        }
+
+        if (ins_option) {
+            if (comments) code += '// returns root of new treap. only insert single nodes\n'
+            code += 'ptr ins(ptr n, ptr it) {\n' +
+                '    if (!n) return it;\n'
+            if (push) code += '    push(n);\n'
+            code += '    if (n->pri < it->pri) {\n' +
+                '        auto [l, r] = split(n, it->key);\n' +
+                '        it->l = l, it->r = r;\n' +
+                `        return ${pull ? 'pull(it)' : 'it'};\n` +
+                '    }\n' +
+                '    if (it->key <= n->key) n->l = ins(n->l, it);\n' +
+                '    else n->r = ins(n->r, it);\n' +
+                `    return ${pull ? 'pull(n)' : 'n'};\n` +
+                '}\n\n'
+        }
+
         if (spliti_option) {
+            if (comments) code += '// [-inf, i) and [i, inf]\n'
             code += 'std::pair<ptr, ptr> spliti(ptr n, int i) {\n' +
                 '    if (!n) return {nullptr, nullptr};\n'
-            if (enable_par) code += '    n->par = nullptr;\n'
+            if (par_option) code += '    n->par = nullptr;\n'
             if (push) code += '    push(n);\n'
             code += '    if (i <= sz(n->l)) {\n' +
                 '        auto [l, r] = spliti(n->l, i);\n' +
@@ -594,6 +693,63 @@
                 '}\n\n'
         }
 
+        if (insi_option) {
+            if (comments) code += "// inserts node such that it will be at index i. only insert single nodes\n"
+            code += 'ptr insi(ptr n, ptr it, int i) {\n' +
+                '    if (!n) return it;\n'
+            if (push) code += '    push(n);\n'
+            code += '    if (n->pri < it->pri) {\n' +
+                '        auto [l, r] = spliti(n, i);\n' +
+                '        it->l = l, it->r = r;\n' +
+                `        return ${pull ? 'pull(it)' : 'it'};\n` +
+                '    }\n' +
+                '    if (i <= sz(n->l)) n->l = insi(n->l, it, i);\n' +
+                '    else n->r = insi(n->r, it, i - 1 - sz(n->l));\n' +
+                `    return ${pull ? 'pull(n)' : 'n'};\n` +
+                '}\n\n'
+        }
+
+        if (max_option) {
+            code += 'ptr mn(ptr n) {\n' +
+                '    if (!n) return nullptr;\n' +
+                '    return max(n, mn(n->l));\n' +
+                '}\n\n'
+        }
+
+        if (min_option) {
+            code += 'ptr mx(ptr n) {\n' +
+                '    if (!n) return nullptr;\n' +
+                '    return max(n, mx(n->r));\n' +
+                '}\n\n'
+        }
+
+        if (unite_option) {
+            if (comments) code += '// proof of complexity: https://codeforces.com/blog/entry/108601\n';
+            code += 'ptr unite(ptr l, ptr r) {\n' +
+                '    if (!l || !r) return l ? l : r;\n' +
+                '    if (mn(l) > mn(r)) swap(l, r);\n' +
+                '    ptr res = 0;\n' +
+                '    while (r) {\n' +
+                '        auto [lt, rt] = split(l, mn(r) + 1);\n' +
+                '        res = merge(res, lt);\n' +
+                '        tie(l, r) = make_pair(r, rt);\n' +
+                '    }\n' +
+                '    return merge(res, l);\n' +
+                '}\n\n'
+        }
+
+        if (unite_fast_option) {
+            if (comments) code += '// fast in practice (i think?)'
+            coder += 'ptr unite_fast(ptr l, ptr r) {\n' +
+                '    if (!l || !r) return l ? l : r;\n' +
+                '    if (l->pri < r->pri) swap(l, r);\n' +
+                '    auto [lhs, rhs] = split(r, l->key);\n' +
+                '    l->l = unite(l->l, lhs);\n' +
+                '    l->r = unite(l->r, rhs);\n' +
+                `    return ${pull ? 'pull(l)' : 'l'};\n` +
+                '}\n\n'
+        }
+
         if (merge_option) {
             code += 'ptr merge(ptr l, ptr r) {\n' +
                 '    if (!l || !r) return l ? l : r;\n'
@@ -603,9 +759,15 @@
                 '}\n\n'
         }
 
+        if (three_merge_option) {
+            code += 'ptr merge(ptr l, ptr m, ptr r) {\n' +
+                    '    return merge(l, merge(m, r));\n' +
+                '}\n\n'
+        }
+
         if (range_update_key) {
             code += `void upd(ptr& n, ${key_type} lo, ${key_type} hi, Lazy lazy) {\n` +
-                `    auto [lm, r] = split(n, ${range_type === 'inc exc' ? 'hi' : 'hi + 1'});\n` +
+                `    auto [lm, r] = split(n, ${incexc ? 'hi' : 'hi + 1'});\n` +
                 '    auto [l, m] = split(lm, lo);\n' +
                 '    if (m) m->lazy += lazy;\n' +
                 '    n = merge(l, merge(m, r));\n' +
@@ -613,32 +775,85 @@
         }
 
         if (range_update_index) {
-            code += 'void updi(ptr& n, int lo, int hi, Lazy lazy) {\n' +
-                `    auto [lm, r] = spliti(n, ${range_type === 'inc exc' ? 'hi' : 'hi + 1'});\n` +
-                '    auto [l, m] = spliti(lm, lo);\n' +
-                '    if (m) m->lazy += lazy;\n' +
-                '    n = merge(l, merge(m, r));\n' +
+            code += 'void updi(ptr n, int lo, int hi, Lazy lazy) {\n' +
+                '    if (!n) return;\n'
+            if (push) code += '    push(n);\n'
+            code += `    if (lo >= n->sz || hi <${incexc ? '=' : ''} 0) return;\n` +
+                `    if (lo <= 0 && n->sz${incexc ? '' : ' - 1'} <= hi) {\n` +
+                '        n->lazy += lazy;\n'
+            if (push) code += '        push(n);\n'
+            code += '        return;\n' +
+                '    }\n' +
+                `    if (lo <= sz(n->l) && sz(n->l) <${incexc ? '' : '='} hi) n->val.upd(lazy${size_option ? ', 1' : ''});\n` +
+                '    updi(n->l, lo, hi, lazy);\n' +
+                '    updi(n->r, lo - 1 - sz(n->l), hi - 1 - sz(n->l), lazy);\n' +
+                '    pull(n);\n' +
                 '}\n\n'
         }
 
         if (range_query_key) {
             code += `Value query(ptr& n, ${key_type} lo, ${key_type} hi) {\n` +
-                `    auto [lm, r] = split(n, ${range_type === 'inc exc' ? 'hi' : 'hi + 1'});\n` +
+                `    auto [lm, r] = split(n, ${incexc ? 'hi' : 'hi + 1'});\n` +
                 '    auto [l, m] = split(lm, lo);\n' +
                 '    Value res = agg(m);\n' +
                 '    n = merge(l, merge(m, r));\n' +
                 '    return res;\n' +
-                '}'
+                '}\n\n'
         }
 
         if (range_query_index) {
-            code += 'Value queryi(ptr& n, int lo, int hi) {\n' +
-                `    auto [lm, r] = spliti(n, ${range_type === 'inc exc' ? 'hi' : 'hi + 1'});\n` +
-                '    auto [l, m] = spliti(lm, lo);\n' +
-                '    Value res = agg(m);\n' +
-                '    n = merge(l, merge(m, r));\n' +
+            code += 'Value queryi(ptr n, int lo, int hi) {\n' +
+                `    if (!n || lo >= sz(n) || hi <${incexc ? '=' : ''} 0) return vid;\n`
+            if (push) code += '    push(n);\n'
+            code += `    if (lo <= 0 && sz(n)${incexc ? '' : ' - 1'} <= hi) return n->agg;\n` +
+                `    return queryi(n->l, lo, hi) + (lo <= sz(n->l) && sz(n->l) <${incexc ? '' : '='} hi ? n->val : vid) + queryi(n->r, lo - 1 - sz(n->l), hi - 1 - sz(n->l));\n` +
+                '}\n\n  '
+        }
+
+        if (clean_option) {
+            code += 'void clean(ptr n) {\n' +
+                '    if (!n) return;\n' +
+                '    clean(n->par);\n' +
+                '    push(n);\n' +
+                '}\n\n'
+        }
+
+        if (order_option) {
+            code += 'int order(ptr n, ptr from = 0) {\n' +
+                '    if (!n) return -1; // hack\n' +
+                '    int res = order(n->par, n);\n' +
+                '    if (from == n->r || !from) res += sz(n->l) + 1;\n' +
                 '    return res;\n' +
-                '}'
+                '}\n\n';
+        }
+
+        if (heapify_option) {
+            code += 'void heapify(ptr n) {\n' +
+                '    if (!n) return;\n' +
+                '    ptr mx = n;\n' +
+                '    if (n->l && n->l->pri > mx->pri) mx = n->l;\n' +
+                '    if (n->r && n->r->pri > mx->pri) mx = n->r;\n' +
+                '    if (mx != n) swap(n->pri, mx->pri), heapify(mx);\n' +
+                '}\n\n'
+        }
+
+        if (build_option) {
+            code += 'ptr build(int l, int r, std::vector<ptr>& ns) {\n' +
+                '    if (l > r) return nullptr;\n' +
+                '    if (l == r) return ns[l];\n' +
+                '    int m = (r + l) / 2;\n' +
+                '    ns[m]->l = build(l, m - 1, ns);\n' +
+                '    ns[m]->r = build(m + 1, r, ns);\n' +
+                '    heapify(ns[m]);\n' +
+                '    return pull(ns[m]);\n' +
+                '}\n\n'
+        }
+
+        if (template) {
+            code += 'main() {\n' +
+                '    cin.tie(0)->sync_with_stdio(0);\n' +
+                '    \n' +
+                '}\n'
         }
 
         // POST PROCESSING
