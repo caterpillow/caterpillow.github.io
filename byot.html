@@ -715,17 +715,17 @@
                 '}\n\n'
         }
 
-        if (max_option) {
+        if (min_option) {
             code += 'ptr mn(ptr n) {\n' +
                 '    if (!n) return nullptr;\n' +
                 '    return max(n, mn(n->l));\n' +
                 '}\n\n'
         }
 
-        if (min_option) {
+        if (max_option) {
             code += 'ptr mx(ptr n) {\n' +
                 '    if (!n) return nullptr;\n' +
-                '    return max(n, mx(n->r));\n' +
+                '    return max(n, mn(n->r));\n' +
                 '}\n\n'
         }
 
