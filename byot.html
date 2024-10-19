@@ -75,19 +75,20 @@
         <option value="none">None</option>
         <option value="int">int</option>
         <option value="long long">long long</option>
+        <option value="T">T</option>
     </select>
     <br>
     <label><input type="checkbox" id="split_option"> Enable split</label><br>
-    <label><input type="checkbox" id="find_option"> Enable find (untested)</label><br>
-    <label><input type="checkbox" id="ins_option"> Enable point insert (untested)</label><br>
+    <label><input type="checkbox" id="find_option"> Enable find</label><br>
+    <label><input type="checkbox" id="ins_option"> Enable point insert</label><br>
 </div>
 <hr>
 
 <!-- Size option -->
 <div>
     <label><input type="checkbox" id="size_option"> Enable size</label><br>
-    <label><input type="checkbox" id="spliti_option"> Enable split by index (untested)</label><br>
-    <label><input type="checkbox" id="insi_option"> Enable point insert by index (untested)</label><br>
+    <label><input type="checkbox" id="spliti_option"> Enable split by index</label><br>
+    <label><input type="checkbox" id="insi_option"> Enable point insert by index</label><br>
 </div>
 <hr>
 
@@ -416,6 +417,9 @@
         if (range_sum && val_type !== 'long long') {
             addWarning("Be careful for overflows when using range sum with integers.")
         }
+        if (ins_option || insi_option) {
+            addWarning("Insert has not been tested (beware)");
+        }
     }
     function displayWarnings() {
         const warningDiv = document.getElementById("warnings");
@@ -481,6 +485,7 @@
         }
 
         if (lazy_prop) {
+            if (range_set && comments) code += "// val is the increment ammount, inc is a bool for whether this tag increments (inc = false means set)\n"
             code += `struct Lazy {\n`;
             if (range_reverse) code += '    bool rev;\n'
             if (range_add || range_set) code += `    ${val_type} val;\n`;
@@ -545,8 +550,9 @@
 
         {
             code += "std::mt19937 mt(std::chrono::steady_clock::now().time_since_epoch().count());\n" +
-                "using ptr = struct Node*;\n\n" +
-                "struct Node {\n"
+                "using ptr = struct Node*;\n"
+            if (key_type === "T") code += 'using T = ;\n'
+            code += "\nstruct Node {\n"
             if (enable_value) code += "    Value val;\n";
             if (range_agg) code += "    Value agg;\n";
             if (lazy_prop) code += "    Lazy lazy;\n";
@@ -838,12 +844,13 @@
         }
 
         if (build_option) {
-            code += 'ptr build(int l, int r, std::vector<ptr>& ns) {\n' +
+            code += 'ptr build(std::vector<ptr>& ns, int l = 0, int r = -1) {\n' +
+                '    if (r == -1) r = ((int) ns.size()) - 1;\n' +
                 '    if (l > r) return nullptr;\n' +
                 '    if (l == r) return ns[l];\n' +
                 '    int m = (r + l) / 2;\n' +
-                '    ns[m]->l = build(l, m - 1, ns);\n' +
-                '    ns[m]->r = build(m + 1, r, ns);\n' +
+                '    ns[m]->l = build(ns, l, m - 1);\n' +
+                '    ns[m]->r = build(ns, m + 1, r);\n' +
                 '    heapify(ns[m]);\n' +
                 '    return pull(ns[m]);\n' +
                 '}\n\n'
