@@ -349,7 +349,7 @@
 
     function copyCode() {
         code = "";
-        if (signature) code += "// generated at caterpillow.github.io/byot.html\n\n";
+        if (signature) code += "// generated at caterpillow.github.io/byot\n\n";
         code += document.getElementById("code_display").textContent;
 
         navigator.clipboard.writeText(code).then(() => {
