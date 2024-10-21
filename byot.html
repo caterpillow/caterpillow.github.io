@@ -104,6 +104,7 @@
     <label><input type="checkbox" id="unite_fast_option"> Include treap union (brute)</label><br>
     <label><input type="checkbox" id="heapify_option"> Include heapify</label><br>
     <label><input type="checkbox" id="build_option"> Include build</label><br>
+    <label><input type="checkbox" id="tour_option"> Include tour</label><br>
 </div>
 <hr>
 
@@ -213,6 +214,7 @@
     let order_option = false;
     let heapify_option = false;
     let build_option = false;
+    let tour_option = false;
 
 
     // Static dependencies graph
@@ -417,6 +419,7 @@
         order_option = document.getElementById("order_option").checked;
         build_option = document.getElementById("build_option").checked;
         heapify_option = document.getElementById("heapify_option").checked;
+        tour_option = document.getElementById("tour_option").checked;
 
         clearWarnings();
         applyDependencies();
@@ -434,7 +437,7 @@
         if (range_sum && val_type !== 'long long') {
             addWarning("Be careful for overflows when using range sum with integers.")
         }
-        if (ins_option || insi_option) {
+        if (insi_option) {
             addWarning("Insert has not been tested (beware)");
         }
     }
@@ -655,6 +658,24 @@
                 '}\n\n'
         }
 
+        if (merge_option) {
+            code += 'ptr merge(ptr l, ptr r) {\n' +
+                '    if (!l || !r) return l ? l : r;\n'
+            if (push) code += '    push(l), push(r);\n';
+            code += `    if (l->pri > r->pri) return l->r = merge(l->r, r), ${pull ? 'pull(l)' : 'l'};\n` +
+                `    else return r->l = merge(l, r->l), ${pull ? 'pull(r)' : 'r'};\n` +
+                '}\n\n'
+        }
+
+        if (n_merge_option) {
+            code += 'ptr merge(ptr n) { return n; }\n' +
+                '\n' +
+                'template<class... Args>\n' +
+                'ptr merge(ptr l, ptr r, Args... args) {\n' +
+                '    return merge(merge(l, r), args...);\n' +
+                '}\n\n'
+        }
+
         if (split_option) {
             if (comments) code += '// [-inf, k) and [k, inf]\n'
             code += `std::pair<ptr, ptr> split(ptr n, ${key_type} k) {\n`;
@@ -708,7 +729,7 @@
         }
 
         if (del_option) {
-            code += 'ptr del(ptr n, ${key_type} k) {\n' +
+            code += `ptr del(ptr n, ${key_type} k) {\n` +
                 '    if (!n) return nullptr;\n'
             if (push) code += '    push(n);\n'
             code += '    if (n->key == k) return merge(n->l, n->r);\n' +
@@ -816,22 +837,6 @@
                 '}\n\n'
         }
 
-        if (merge_option) {
-            code += 'ptr merge(ptr l, ptr r) {\n' +
-                '    if (!l || !r) return l ? l : r;\n'
-            if (push) code += '    push(l), push(r);\n';
-            code += '    if (l->pri > r->pri) return l->r = merge(l->r, r), pull(l);\n' +
-                '    else return r->l = merge(l, r->l), pull(r);\n' +
-                '}\n\n'
-        }
-
-        if (n_merge_option) {
-            code += 'template<class... Args>\n' +
-                'ptr merge(ptr l, ptr r, Args... args) {\n' +
-                '    return merge(merge(l, r), args...);\n' +
-                '}\n\n'
-        }
-
         if (range_update_key) {
             code += `void upd(ptr& n, ${key_type} lo, ${key_type} hi, Lazy lazy) {\n` +
                 `    auto [lm, r] = split(n, ${incexc ? 'hi' : 'hi + 1'});\n` +
@@ -914,6 +919,19 @@
                 '    ns[m]->r = build(ns, m + 1, r);\n' +
                 '    heapify(ns[m]);\n' +
                 `    return ${pull ? 'pull(ns[m])' : 'ns[m]'};\n` +
+                '}\n\n'
+        }
+
+        if (tour_option) {
+            code += 'template <typename Op>\n' +
+                'void tour(ptr n, Op op) {\n' +
+                '    std::stack<ptr> stk;\n' +
+                '    while (n || stk.size()) {\n' +
+                '        for (; n; n = n->l) stk.push(n);\n' +
+                '        n = stk.top(); stk.pop();\n' +
+                '        op(n);\n' +
+                '        n = n->r;\n' +
+                '    }\n' +
                 '}\n\n'
         }
 
