@@ -64,7 +64,7 @@
 <!-- Merge option -->
 <div>
     <label><input type="checkbox" id="merge_option"> Include merge</label><br>
-    <label><input type="checkbox" id="n_merge_option"> Include n-way merge</label><br>
+    <label><input type="checkbox" id="n_merge_option"> Include + merge</label><br>
 </div>
 <hr>
 
@@ -125,6 +125,8 @@
     <label><input type="checkbox" id="range_sum"> Include range sum</label><br>
     <label><input type="checkbox" id="range_max"> Include range max</label><br>
     <label><input type="checkbox" id="range_min"> Include range min</label><br>
+    <br>
+    <label><input type="checkbox" id="key_sum"> Include key sum</label><br>
 </div>
 <hr>
 
@@ -134,6 +136,9 @@
     <label><input type="checkbox" id="range_reverse"> Include range reverse</label><br>
     <label><input type="checkbox" id="range_add"> Include range add</label><br>
     <label><input type="checkbox" id="range_set"> Include range set</label><br>
+    <br>
+    <label><input type="checkbox" id="key_add"> Include key add</label><br>
+    <label><input type="checkbox" id="key_set"> Include key set</label><br>
 </div>
 <hr>
 
@@ -216,6 +221,10 @@
     let build_option = false;
     let tour_option = false;
 
+    let key_sum = false;
+    let key_add = false;
+    let key_set = false;
+
 
     // Static dependencies graph
     const edges = [
@@ -226,6 +235,8 @@
         ["insi_option", "spliti_option"],
         ["range_add", "lazy_prop"],
         ["range_set", "lazy_prop"],
+        ["key_add", "lazy_prop"],
+        ["key_set", "lazy_prop"],
         ["range_update_key", "lazy_prop"],
         ["range_update_key", "merge_option"],
         ["range_update_key", "key_type"],
@@ -233,7 +244,10 @@
         ["range_update_index", "lazy_prop"],
         ["range_update_index", "size_option"],
         ["range_sum", "size_option"],
-        ["range_query_key", "lazy_prop"],
+        ["key_sum", "size_option"],
+        ["key_sum", "key_type"],
+        ["key_add", "key_type"],
+        ["key_set", "key_type"],
         ["range_query_key", "merge_option"],
         ["range_query_key", "key_type"],
         ["range_query_key", "split_option"],
@@ -244,6 +258,7 @@
         ["range_max", "range_agg"],
         ["range_min", "range_agg"],
         ["lazy_prop", "range_agg"],
+        ["key_sum", "range_agg"],
         ["n_merge_option", "merge_option"],
         ["order_option", "par_option"],
         ["order_option", "size_option"],
@@ -420,6 +435,9 @@
         build_option = document.getElementById("build_option").checked;
         heapify_option = document.getElementById("heapify_option").checked;
         tour_option = document.getElementById("tour_option").checked;
+        key_sum = document.getElementById("key_sum").checked;
+        key_add = document.getElementById("key_add").checked;
+        key_set = document.getElementById("key_set").checked;
 
         clearWarnings();
         applyDependencies();
@@ -492,7 +510,8 @@
 
         let inf = (val_type === 'int' ? '1\'000\'000\'000' : '1\'000\'000\'000\'000\'000\'000')
         let enable_value = val_type !== 'none'
-        let pull = size_option || range_sum || range_max || range_min || par_option;
+        let pull = range_agg;
+        // let pull = size_option || range_sum || range_max || range_min || key_sum || par_option;
         let push = lazy_prop;
         let incexc = range_type === 'inc exc';
 
@@ -507,15 +526,24 @@
         if (lazy_prop) {
             if (range_set && comments) code += "// val is the increment ammount, inc is a bool for whether this tag increments (inc = false means set)\n"
             code += `struct Lazy {\n`;
+
             if (range_reverse) code += '    bool rev;\n'
             if (range_add || range_set) code += `    ${val_type} val;\n`;
             if (range_set) code += "    bool inc;\n";
+
+            if (key_add || key_set) code += `    ${key_type} kval;\n`;
+            if (key_set) code += "    bool kinc;\n";
+
             code += "\n";
             code += `    void operator+=(const Lazy& oth) {\n`;
             if (range_reverse) code += '        rev ^= oth.rev;\n'
             if (range_add || range_set) {
                 if (range_set) code += "        if (!oth.inc) val = 0, inc = false;\n";
                 code += "        val += oth.val;\n";
+            }
+            if (key_add || key_set) {
+                if (key_set) code += "        if (!oth.kinc) kval = 0, kinc = false;\n";
+                code += "        kval += oth.kval;\n";
             }
             code += "    }\n";
             code += "};\n\n";
@@ -524,6 +552,8 @@
             if (range_reverse) lazy_id.push("false");
             if (range_add || range_set) lazy_id.push("0");
             if (range_set) lazy_id.push("true");
+            if (key_add || key_set) lazy_id.push("0");
+            if (key_set) lazy_id.push("0")
             code += `const Lazy lid = {${lazy_id.join(", ")}};\n\n`;
         }
 
@@ -532,6 +562,7 @@
             if (range_sum) code += `    ${val_type} sum;\n`;
             if (range_max) code += `    ${val_type} mx;\n`;
             if (range_min) code += `    ${val_type} mn;\n`;
+            if (key_sum) code += `    ${key_type} ksum;\n`;
             code += "\n";
             if (lazy_prop) {
                 code += `    void upd(Lazy lazy${size_option ? ', int sz' : ''}) {\n`
@@ -547,6 +578,14 @@
                     if (range_max) code += '        mx += lazy.val;\n'
                     if (range_min) code += '        mn += lazy.val;\n'
                 }
+                if (key_set) {
+                    items = []
+                    if (key_sum) items.push("ksum = ")
+                    if (items.length > 0) code += `        if (!lazy.kinc) ${items.join('')}0;\n`
+                }
+                if (key_add || key_set) {
+                    if (key_sum) code += '        ksum += lazy.val * sz;\n'
+                }
                 code += '    }\n'
                 code += "\n";
             }
@@ -555,6 +594,7 @@
             if (range_sum) code += "        res.sum = sum + oth.sum;\n";
             if (range_max) code += "        res.mx = std::max(mx, oth.mx);\n";
             if (range_min) code += "        res.mn = std::min(mn, oth.mn);\n";
+            if (key_sum) code += "        res.ksum = ksum + oth.ksum;\n";
             code += "        return res;\n" +
                 "    }\n" +
                 "};\n\n";
@@ -565,6 +605,7 @@
             if (range_sum) val_id.push("0")
             if (range_max) val_id.push(`-${inf}`)
             if (range_min) val_id.push(`${inf}`)
+            if (key_sum) val_id.push("0")
             code += `const Value vid = {${val_id.join(", ")}};\n\n`;
         }
 
@@ -621,6 +662,7 @@
             if (size_option) code += '        sz = 1;\n'
             code += '        l = r = nullptr;\n'
             if (par_option) code += '        par = nullptr;\n'
+            if (key_sum) code += '        val.ksum = agg.ksum = 0;\n'
             code += '    }\n'
 
             code += "};\n\n"
@@ -668,12 +710,9 @@
         }
 
         if (n_merge_option) {
-            code += 'ptr merge(ptr n) { return n; }\n' +
-                '\n' +
-                'template<class... Args>\n' +
-                'ptr merge(ptr l, ptr r, Args... args) {\n' +
-                '    return merge(merge(l, r), args...);\n' +
-                '}\n\n'
+            code += 'ptr operator+(Node& lhs, Node& rhs) { return merge(&lhs, &rhs); }\n' +
+                'ptr operator+(ptr lhs, Node& rhs) { return merge(lhs, &rhs); }\n' +
+                'ptr operator+(Node& lhs, ptr rhs){  return merge(&lhs, rhs); }\n\n'
         }
 
         if (split_option) {
@@ -926,7 +965,7 @@
             code += 'template <typename Op>\n' +
                 'void tour(ptr n, Op op) {\n' +
                 '    std::stack<ptr> stk;\n' +
-                '    while (n || stk.size()) {\n' +
+                '    while (n || !stk.empty()) {\n' +
                 '        for (; n; n = n->l) stk.push(n);\n' +
                 '        n = stk.top(); stk.pop();\n' +
                 '        op(n);\n' +
