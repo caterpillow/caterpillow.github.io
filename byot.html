@@ -548,7 +548,7 @@
 
         let inf = (val_type === 'int' ? '1\'000\'000\'000' : '1\'000\'000\'000\'000\'000\'000')
         let enable_value = val_type !== 'none'
-        let pull = range_agg;
+        let pull = range_agg || par_option || size_option;
         // let pull = size_option || range_sum || range_max || range_min || key_sum || par_option;
         let push = lazy_prop;
         let incexc = range_type === 'inc exc';
@@ -1024,20 +1024,13 @@
                 '}\n\n'
         }
 
-        if (template) {
-            code += 'main() {\n' +
-                '    cin.tie(0)->sync_with_stdio(0);\n' +
-                '    \n' +
-                '}\n'
-        }
-
         // POST PROCESSING
 
         if (use_namespace_std) code = code.replaceAll("std::", "");
         if (use_ll_typedef) code = code.replaceAll("long long", "ll");
         code = code.trim()
         if (namespace_treap) {
-            code = "namespace Treap {\n\n    " + code.replaceAll("\n", "\n    ") + "\n\n}\n\nusing namespace Treap;\n"
+            code = "namespace Treap {\n\n    " + code.replaceAll("\n", "\n    ") + "\n\n}\n\nusing namespace Treap;\n\n"
         }
         if (template) {
             prefix = ""
@@ -1045,6 +1038,12 @@
             if (use_namespace_std) prefix += "using namespace std;\n"
             if (use_ll_typedef) prefix += "using ll = long long;\n\n"
             code = prefix + code
+            if (template) {
+                code += 'main() {\n' +
+                    '    cin.tie(0)->sync_with_stdio(0);\n' +
+                    '    \n' +
+                    '}\n'
+            }
         }
 
         const tab_character = getTabCharacter();
