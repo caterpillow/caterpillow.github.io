@@ -23,147 +23,171 @@
 </div>
 <hr>
 
-<!-- Misc -->
-<div>
-    <label><input type="checkbox" id="signature" checked> Include site tag (pls)</label><br>
-    <label><input type="checkbox" id="comments" checked> Include comments</label><br>
-    <label><input type="checkbox" id="template"> Include template (for testing)</label><br>
-</div>
-<hr>
+<style>
+    .container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+    }
+    .column {
+        flex: 1;
+        min-width: 300px; /* Adjust based on preference */
+    }
+    .column div {
+        margin-bottom: 20px; /* Space between sections */
+    }
+</style>
 
-<!-- Namespace and typedef options -->
-<div>
-    <label><input type="checkbox" id="use_namespace_std" checked> Use namespace std</label><br>
-    <label><input type="checkbox" id="use_ll_typedef" checked> Use ll = long long</label><br>
-</div>
-<hr>
+<div class="container">
+    <!-- Column 1 -->
+    <div class="column">
+        <!-- Misc -->
+        <div>
+            <label><input type="checkbox" id="signature" checked> Include site tag (pls)</label><br>
+            <label><input type="checkbox" id="comments" checked> Include comments</label><br>
+            <label><input type="checkbox" id="template"> Include template (for testing)</label><br>
+        </div>
+        <hr>
 
-<!-- Tab character selection -->
-<div>
-    <label for="tab_char">Choose tab character:</label>
-    <select id="tab_char">
-        <option value="2spaces">2 spaces</option>
-        <option value="3spaces">3 spaces</option>
-        <option value="4spaces" selected>4 spaces</option>
-        <option value="8spaces">8 spaces (wtf)</option>
-        <option value="tab">Tab</option>
-    </select>
-</div>
-<hr>
+        <!-- Namespace and typedef options -->
+        <div>
+            <label><input type="checkbox" id="use_namespace_std" checked> Use namespace std</label><br>
+            <label><input type="checkbox" id="use_ll_typedef" checked> Use ll = long long</label><br>
+            <label><input type="checkbox" id="namespace_treap"> Wrap in namespace Treap</label><br>
+        </div>
+        <hr>
 
-<!-- Range type -->
-<div>
-    <label for="range_type">Choose range type:</label>
-    <select id="range_type">
-        <option value="inc exc" selected>inc exc</option>
-        <option value="inc inc">inc inc</option>
-    </select>
-</div>
-<hr>
+        <!-- Tab character selection -->
+        <div>
+            <label for="tab_char">Choose tab character:</label>
+            <select id="tab_char">
+                <option value="2spaces">2 spaces</option>
+                <option value="3spaces">3 spaces</option>
+                <option value="4spaces" selected>4 spaces</option>
+                <option value="8spaces">8 spaces (wtf)</option>
+                <option value="tab">Tab</option>
+            </select>
+        </div>
+        <hr>
 
-<!-- Merge option -->
-<div>
-    <label><input type="checkbox" id="merge_option"> Include merge</label><br>
-    <label><input type="checkbox" id="n_merge_option"> Include + merge</label><br>
-</div>
-<hr>
+        <!-- Range type -->
+        <div>
+            <label for="range_type">Choose range type:</label>
+            <select id="range_type">
+                <option value="inc exc" selected>inc exc</option>
+                <option value="inc inc">inc inc</option>
+            </select>
+        </div>
+        <hr>
 
-<!-- Key type selection (none, int, long long) -->
-<div>
-    <label for="key_type">Choose key type:</label>
-    <select id="key_type">
-        <option value="none">None</option>
-        <option value="int">int</option>
-        <option value="long long">long long</option>
-        <option value="T">T</option>
-    </select>
-    <br>
-    <label><input type="checkbox" id="split_option"> Include split</label><br>
-    <label><input type="checkbox" id="three_split_option"> Include 3-way split</label><br>
-    <label><input type="checkbox" id="find_option"> Include find</label><br>
-    <label><input type="checkbox" id="ins_option"> Include point insert</label><br>
-    <label><input type="checkbox" id="del_option"> Include point deletion</label><br>
-</div>
-<hr>
+        <!-- Merge option -->
+        <div>
+            <label><input type="checkbox" id="merge_option"> Include merge</label><br>
+            <label><input type="checkbox" id="n_merge_option"> Include n-way merge</label><br>
+            <label><input type="checkbox" id="plus_merge_option"> Include + merge</label><br>
+        </div>
+        <hr>
 
-<!-- Size option -->
-<div>
-    <label><input type="checkbox" id="size_option"> Include size</label><br>
-    <label><input type="checkbox" id="spliti_option"> Include split by index</label><br>
-    <label><input type="checkbox" id="three_spliti_option"> Include 3-way split by index</label><br>
-    <label><input type="checkbox" id="findi_option"> Include find by index</label><br>
-    <label><input type="checkbox" id="insi_option"> Include point insert by index</label><br>
-    <label><input type="checkbox" id="deli_option"> Include point deletion by index</label><br>
-</div>
-<hr>
+        <!-- Key type selection (none, int, long long) -->
+        <div>
+            <label for="key_type">Choose key type:</label>
+            <select id="key_type">
+                <option value="none">None</option>
+                <option value="int">int</option>
+                <option value="long long">long long</option>
+                <option value="T">T</option>
+            </select>
+            <br>
+            <label><input type="checkbox" id="split_option"> Include split</label><br>
+            <label><input type="checkbox" id="three_split_option"> Include 3-way split</label><br>
+            <label><input type="checkbox" id="find_option"> Include find</label><br>
+            <label><input type="checkbox" id="ins_option"> Include point insert</label><br>
+            <label><input type="checkbox" id="del_option"> Include point deletion</label><br>
+        </div>
+        <hr>
 
-<!-- More misc -->
-<div>
-    <label><input type="checkbox" id="max_option"> Include max</label><br>
-    <label><input type="checkbox" id="min_option"> Include min</label><br>
-    <label><input type="checkbox" id="unite_option"> Include treap union (amortization)</label><br>
-    <label><input type="checkbox" id="unite_fast_option"> Include treap union (brute)</label><br>
-    <label><input type="checkbox" id="heapify_option"> Include heapify</label><br>
-    <label><input type="checkbox" id="build_option"> Include build</label><br>
-    <label><input type="checkbox" id="tour_option"> Include tour</label><br>
-</div>
-<hr>
+        <!-- Size option -->
+        <div>
+            <label><input type="checkbox" id="size_option"> Include size</label><br>
+            <label><input type="checkbox" id="spliti_option"> Include split by index</label><br>
+            <label><input type="checkbox" id="three_spliti_option"> Include 3-way split by index</label><br>
+            <label><input type="checkbox" id="findi_option"> Include find by index</label><br>
+            <label><input type="checkbox" id="insi_option"> Include point insert by index</label><br>
+            <label><input type="checkbox" id="deli_option"> Include point deletion by index</label><br>
+        </div>
+    </div>
 
-<!-- Dropdown for value type -->
-<div>
-    <label for="val_type">Choose value type:</label>
-    <select id="val_type">
-        <option value="none">None</option>
-        <option value="int">int</option>
-        <option value="long long">long long</option>
-    </select>
-</div>
-<hr>
+    <!-- Column 2 -->
+    <div class="column">
 
-<!-- Range aggregates -->
-<div>
-    <label><input type="checkbox" id="range_agg"> Include range aggregates</label><br>
-    <label><input type="checkbox" id="range_sum"> Include range sum</label><br>
-    <label><input type="checkbox" id="range_max"> Include range max</label><br>
-    <label><input type="checkbox" id="range_min"> Include range min</label><br>
-    <br>
-    <label><input type="checkbox" id="key_sum"> Include key sum</label><br>
-</div>
-<hr>
+        <!-- More misc -->
+        <div>
+            <label><input type="checkbox" id="max_option"> Include max</label><br>
+            <label><input type="checkbox" id="min_option"> Include min</label><br>
+            <label><input type="checkbox" id="unite_option"> Include treap union (amortization)</label><br>
+            <label><input type="checkbox" id="unite_fast_option"> Include treap union (brute)</label><br>
+            <label><input type="checkbox" id="heapify_option"> Include heapify</label><br>
+            <label><input type="checkbox" id="build_option"> Include build</label><br>
+            <label><input type="checkbox" id="tour_option"> Include tour</label><br>
+        </div>
+        <hr>
 
-<!-- Lazy propagation -->
-<div>
-    <label><input type="checkbox" id="lazy_prop"> Include lazy propagation</label><br>
-    <label><input type="checkbox" id="range_reverse"> Include range reverse</label><br>
-    <label><input type="checkbox" id="range_add"> Include range add</label><br>
-    <label><input type="checkbox" id="range_set"> Include range set</label><br>
-    <br>
-    <label><input type="checkbox" id="key_add"> Include key add</label><br>
-    <label><input type="checkbox" id="key_set"> Include key set</label><br>
-</div>
-<hr>
+        <!-- Dropdown for value type -->
+        <div>
+            <label for="val_type">Choose value type:</label>
+            <select id="val_type">
+                <option value="none">None</option>
+                <option value="int">int</option>
+                <option value="long long">long long</option>
+            </select>
+        </div>
+        <hr>
 
-<!-- Range updates -->
-<div>
-    <label><input type="checkbox" id="range_update_key"> Include range updates (key)</label><br>
-    <label><input type="checkbox" id="range_update_index"> Include range updates (index)</label><br>
-</div>
-<hr>
+        <!-- Range aggregates -->
+        <div>
+            <label><input type="checkbox" id="range_agg"> Include range aggregates</label><br>
+            <label><input type="checkbox" id="range_sum"> Include range sum</label><br>
+            <label><input type="checkbox" id="range_max"> Include range max</label><br>
+            <label><input type="checkbox" id="range_min"> Include range min</label><br>
+            <br>
+            <label><input type="checkbox" id="key_sum"> Include key sum</label><br>
+        </div>
+        <hr>
 
-<!-- Range queries -->
-<div>
-    <label><input type="checkbox" id="range_query_key"> Include range queries (key)</label><br>
-    <label><input type="checkbox" id="range_query_index"> Include range queries (index)</label><br>
-</div>
-<hr>
+        <!-- Lazy propagation -->
+        <div>
+            <label><input type="checkbox" id="lazy_prop"> Include lazy propagation</label><br>
+            <label><input type="checkbox" id="range_reverse"> Include range reverse</label><br>
+            <label><input type="checkbox" id="range_add"> Include range add</label><br>
+            <label><input type="checkbox" id="range_set"> Include range set</label><br>
+            <br>
+            <label><input type="checkbox" id="key_add"> Include key add</label><br>
+            <label><input type="checkbox" id="key_set"> Include key set</label><br>
+        </div>
+        <hr>
 
-<!-- Parent pointer stuff -->
-<div>
-    <label><input type="checkbox" id="par_option"> Include parent pointers</label><br>
-    <label><input type="checkbox" id="clean_option"> Include clean (given a pointer to a node, flushes all lazy tags)</label><br>
-    <label><input type="checkbox" id="order_option"> Include order (finds index of a node)</label><br>
+        <!-- Range updates -->
+        <div>
+            <label><input type="checkbox" id="range_update_key"> Include range updates (key)</label><br>
+            <label><input type="checkbox" id="range_update_index"> Include range updates (index)</label><br>
+        </div>
+        <hr>
+
+        <!-- Range queries -->
+        <div>
+            <label><input type="checkbox" id="range_query_key"> Include range queries (key)</label><br>
+            <label><input type="checkbox" id="range_query_index"> Include range queries (index)</label><br>
+        </div>
+        <hr>
+
+        <!-- Parent pointer stuff -->
+        <div>
+            <label><input type="checkbox" id="par_option"> Include parent pointers</label><br>
+            <label><input type="checkbox" id="clean_option"> Include clean (given a pointer to a node, flushes all lazy tags)</label><br>
+            <label><input type="checkbox" id="order_option"> Include order (finds index of a node)</label><br>
+        </div>
+    </div>
 </div>
-<hr>
 
 <!-- Warning area -->
 <div id="warnings" class="warning"></div>
@@ -182,6 +206,7 @@
     let use_ll_typedef = false;
     let merge_option = false;
     let n_merge_option = false;
+    let plus_merge_option = false;
     let key_type = 'none';
     let split_option = false;
     let three_split_option = false;
@@ -227,6 +252,8 @@
     let key_add = false;
     let key_set = false;
 
+    let namespace_treap = false;
+
 
     // Static dependencies graph
     const edges = [
@@ -236,6 +263,8 @@
         ["spliti_option", "size_option"],
         ["insi_option", "spliti_option"],
         ["findi_option", "size_option"],
+        ["n_merge_option", "merge_option"],
+        ["n_merge_option", "namespace_treap"],
         ["range_add", "lazy_prop"],
         ["range_set", "lazy_prop"],
         ["key_add", "lazy_prop"],
@@ -262,7 +291,7 @@
         ["range_min", "range_agg"],
         ["lazy_prop", "range_agg"],
         ["key_sum", "range_agg"],
-        ["n_merge_option", "merge_option"],
+        ["plus_merge_option", "merge_option"],
         ["order_option", "par_option"],
         ["order_option", "size_option"],
         ["clean_option", "par_option"],
@@ -400,6 +429,7 @@
         use_ll_typedef = document.getElementById("use_ll_typedef").checked;
         merge_option = document.getElementById("merge_option").checked;
         n_merge_option = document.getElementById("n_merge_option").checked;
+        plus_merge_option = document.getElementById("plus_merge_option").checked;
         key_type = document.getElementById("key_type").value;
         split_option = document.getElementById("split_option").checked;
         three_split_option = document.getElementById("three_split_option").checked;
@@ -442,6 +472,7 @@
         key_sum = document.getElementById("key_sum").checked;
         key_add = document.getElementById("key_add").checked;
         key_set = document.getElementById("key_set").checked;
+        namespace_treap = document.getElementById("namespace_treap").checked;
 
         clearWarnings();
         applyDependencies();
@@ -461,6 +492,9 @@
         }
         if (insi_option) {
             addWarning("Insert has not been tested (beware)");
+        }
+        if (n_merge_option) {
+            addWarning("Merge with 5+ arguments will conflict with std::merge. Do Treap::merge(...) for 5 or more arguments.")
         }
     }
     function displayWarnings() {
@@ -520,12 +554,6 @@
         let incexc = range_type === 'inc exc';
 
         // start code displaying
-
-        if (template) {
-            code += "#include <bits/stdc++.h>\n\n";
-            if (use_namespace_std) code += "using namespace std;\n"
-            if (use_ll_typedef) code += "using ll = long long;\n\n"
-        }
 
         if (lazy_prop) {
             if (range_set && comments) code += "// val is the increment ammount, inc is a bool for whether this tag increments (inc = false means set)\n"
@@ -714,6 +742,13 @@
         }
 
         if (n_merge_option) {
+            code += 'template<typename... Args>\n' +
+                'ptr merge(ptr l, Args... args) {\n' +
+                '    return merge(l, merge(args...));\n' +
+                '}\n\n'
+        }
+
+        if (plus_merge_option) {
             code += 'ptr operator+(Node& lhs, Node& rhs) { return merge(&lhs, &rhs); }\n' +
                 'ptr operator+(ptr lhs, Node& rhs) { return merge(lhs, &rhs); }\n' +
                 'ptr operator+(Node& lhs, ptr rhs){  return merge(&lhs, rhs); }\n\n'
@@ -1000,7 +1035,18 @@
 
         if (use_namespace_std) code = code.replaceAll("std::", "");
         if (use_ll_typedef) code = code.replaceAll("long long", "ll");
-        if (template) code = code.replaceAll("using ll = ll;", "using ll = long long;")
+        code = code.trim()
+        if (namespace_treap) {
+            code = "namespace Treap {\n\n    " + code.replaceAll("\n", "\n    ") + "\n\n}\n\nusing namespace Treap;\n"
+        }
+        if (template) {
+            prefix = ""
+            prefix += "#include <bits/stdc++.h>\n\n"
+            if (use_namespace_std) prefix += "using namespace std;\n"
+            if (use_ll_typedef) prefix += "using ll = long long;\n\n"
+            code = prefix + code
+        }
+
         const tab_character = getTabCharacter();
         code = code.replace(/ {4}/g, tab_character);
         document.getElementById("code_display").textContent = code;
