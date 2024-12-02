@@ -490,9 +490,6 @@
         if (range_sum && val_type !== 'long long') {
             addWarning("Be careful for overflows when using range sum with integers.")
         }
-        if (insi_option) {
-            addWarning("Insert has not been tested (beware)");
-        }
         if (n_merge_option) {
             addWarning("Merge with 5+ arguments will conflict with std::merge. Do Treap::merge(...) for 5 or more arguments.")
         }
@@ -556,7 +553,7 @@
         // start code displaying
 
         if (lazy_prop) {
-            if (range_set && comments) code += "// val is the increment ammount, inc is a bool for whether this tag increments (inc = false means set)\n"
+            if (range_set && comments) code += "// val is the increment amount, inc is a bool for whether this tag increments (inc = false means set)\n"
             code += `struct Lazy {\n`;
 
             if (range_reverse) code += '    bool rev;\n'
@@ -590,6 +587,7 @@
         }
 
         if (enable_value) {
+            if (comments) code += "// You can implement your own monoid here for custom operations.\n";
             code += `struct Value {\n`;
             if (range_sum) code += `    ${val_type} sum;\n`;
             if (range_max) code += `    ${val_type} mx;\n`;
@@ -818,6 +816,7 @@
         }
 
         if (del_option) {
+            if (comments) code += "// returns root of new treap\n"
             code += `ptr del(ptr n, ${key_type} k) {\n` +
                 '    if (!n) return nullptr;\n'
             if (push) code += '    push(n);\n'
@@ -856,7 +855,7 @@
         }
 
         if (insi_option) {
-            if (comments) code += "// inserts node such that it will be at index i. only insert single nodes\n"
+            if (comments) code += "// inserts node such that it will be at index i. returns root of new treap. only insert single nodes\n"
             code += 'ptr insi(ptr n, ptr it, int i) {\n' +
                 '    if (!n) return it;\n'
             if (push) code += '    push(n);\n'
@@ -872,6 +871,7 @@
         }
 
         if (deli_option) {
+            if (comments) code += "// returns root of new treap\n"
             code += 'ptr deli(ptr n, int i) {\n' +
                 '    if (!n) return nullptr;\n'
             if (push) code += '    push(n);\n'
