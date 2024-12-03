@@ -20,6 +20,9 @@
     You can right click a disabled checkbox/dropdown to enable all its prerequisites. <br>
     Half this site is written by ChatGPT so don't judge too harshly. <br>
     If you have any suggestions or find any bugs (highly likely), my discord is caterpillow<br>
+    <br>
+    The "key" field is for ordered multiset operations, while the "size" options are for implicit treap operations.
+    The "value" field is for taking range aggregates.
 </div>
 <hr>
 
@@ -134,17 +137,18 @@
 
         <!-- Dropdown for value type -->
         <div>
-            <label for="val_type">Choose value type:</label>
-            <select id="val_type">
-                <option value="none">None</option>
-                <option value="int">int</option>
-                <option value="long long">long long</option>
-            </select>
+            <label><input type="checkbox" id="enable_value"> Enable value</label><br>
         </div>
         <hr>
 
         <!-- Range aggregates -->
         <div>
+            <label for="val_type">Choose value type:</label>
+            <select id="val_type">
+                <option value="none">None</option>
+                <option value="int">int</option>
+                <option value="long long">long long</option>
+            </select><br>
             <label><input type="checkbox" id="range_agg"> Include range aggregates</label><br>
             <label><input type="checkbox" id="range_sum"> Include range sum</label><br>
             <label><input type="checkbox" id="range_max"> Include range max</label><br>
@@ -157,7 +161,8 @@
         <!-- Lazy propagation -->
         <div>
             <label><input type="checkbox" id="lazy_prop"> Include lazy propagation</label><br>
-            <label><input type="checkbox" id="range_reverse"> Include range reverse</label><br>
+            <label><input type="checkbox" id="range_reverse_key"> Include range reverse (key)</label><br>
+            <label><input type="checkbox" id="range_reverse_index"> Include range reverse (index)</label><br>
             <label><input type="checkbox" id="range_add"> Include range add</label><br>
             <label><input type="checkbox" id="range_set"> Include range set</label><br>
             <br>
@@ -185,10 +190,14 @@
             <label><input type="checkbox" id="par_option"> Include parent pointers</label><br>
             <label><input type="checkbox" id="clean_option"> Include clean (given a pointer to a node, flushes all lazy tags)</label><br>
             <label><input type="checkbox" id="order_option"> Include order (finds index of a node)</label><br>
+            <label><input type="checkbox" id="root_option"> Include root (returns the root of some treap node)</label><br>
         </div>
     </div>
 </div>
-
+<hr>
+<label><input type="checkbox" id="treap_beats"> Enable treap beats template</label><br>
+<hr>
+Warnings:
 <!-- Warning area -->
 <div id="warnings" class="warning"></div>
 <hr>
@@ -228,12 +237,15 @@
     let range_min = false;
     let lazy_prop = false;
     let range_reverse = false;
+    let range_reverse_key = false;
+    let range_reverse_index = false;
     let range_add = false;
     let range_set = false;
     let range_update_key = false;
     let range_update_index = false;
     let range_query_key = false;
     let range_query_index = false;
+    let enable_value = false;
     let val_type = 'none';
     let range_type = 'inc exc'
     let range_agg = false;
@@ -253,6 +265,8 @@
     let key_set = false;
 
     let namespace_treap = false;
+    let treap_beats = false;
+    let root_option = false;
 
 
     // Static dependencies graph
@@ -283,12 +297,15 @@
         ["range_query_key", "merge_option"],
         ["range_query_key", "key_type"],
         ["range_query_key", "split_option"],
-        ["range_query_index", "lazy_prop"],
+        ["range_query_key", "range_agg"],
         ["range_query_index", "size_option"],
-        ["range_agg", "val_type"],
+        ["range_query_index", "range_agg"],
         ["range_sum", "range_agg"],
+        ["range_sum", "val_type"],
         ["range_max", "range_agg"],
+        ["range_max", "val_type"],
         ["range_min", "range_agg"],
+        ["range_min", "val_type"],
         ["key_sum", "range_agg"],
         ["plus_merge_option", "merge_option"],
         ["order_option", "par_option"],
@@ -300,12 +317,22 @@
         ["unite_option", "min_option"],
         ["unite_fast_option", "split_option"],
         ["build_option", "heapify_option"],
-        ["range_reverse", "lazy_prop"],
+        ["range_reverse_key", "lazy_prop"],
+        ["range_reverse_index", "lazy_prop"],
+        ["range_reverse_key", "merge_option"],
+        ["range_reverse_index", "merge_option"],
+        ["range_reverse_key", "split_option"],
+        ["range_reverse_index", "spliti_option"],
         ["del_option", "merge_option"],
         ["deli_option", "merge_option"],
         ["deli_option", "size_option"],
         ["three_split_option", "split_option"],
-        ["three_spliti_option", "spliti_option"]
+        ["three_spliti_option", "spliti_option"],
+        ["treap_beats", "range_agg"],
+        ["treap_beats", "lazy_prop"],
+        ["val_type", "enable_value"],
+        ["range_agg", "enable_value"],
+        ["root_option", "par_option"]
     ];
 
     const sortedDependencies = topsort(edges);
@@ -449,7 +476,9 @@
         range_max = document.getElementById("range_max").checked;
         range_min = document.getElementById("range_min").checked;
         lazy_prop = document.getElementById("lazy_prop").checked;
-        range_reverse = document.getElementById("range_reverse").checked;
+        range_reverse_key = document.getElementById("range_reverse_key").checked;
+        range_reverse_index = document.getElementById("range_reverse_index").checked;
+        range_reverse = range_reverse_key || range_reverse_index;
         range_add = document.getElementById("range_add").checked;
         range_set = document.getElementById("range_set").checked;
         range_update_key = document.getElementById("range_update_key").checked;
@@ -472,6 +501,10 @@
         key_add = document.getElementById("key_add").checked;
         key_set = document.getElementById("key_set").checked;
         namespace_treap = document.getElementById("namespace_treap").checked;
+        treap_beats = document.getElementById("treap_beats").checked;
+        enable_value = document.getElementById("enable_value").checked;
+        root_option = document.getElementById("root_option").checked;
+
 
         clearWarnings();
         applyDependencies();
@@ -543,7 +576,6 @@
         let code = "";
 
         let inf = (val_type === 'int' ? '1\'000\'000\'000' : '1\'000\'000\'000\'000\'000\'000')
-        let enable_value = val_type !== 'none'
         let pull = range_agg || par_option || size_option;
         // let pull = size_option || range_sum || range_max || range_min || key_sum || par_option;
         let push = lazy_prop;
@@ -593,6 +625,17 @@
             if (range_min) code += `    ${val_type} mn;\n`;
             if (key_sum) code += `    ${key_type} ksum;\n`;
             code += "\n";
+
+            if (treap_beats) {
+                code += '    bool can_break(const Lazy& lazy) {\n' +
+                    '        return false;\n' +
+                    '    }\n' +
+                    '\n' +
+                    '    bool can_tag(const Lazy& lazy) {\n' +
+                    '        return true;\n' +
+                    '    }\n\n'
+            }
+
             if (lazy_prop) {
                 code += `    void upd(Lazy lazy${size_option ? ', int sz' : ''}) {\n`
                 if (range_set) {
@@ -615,20 +658,21 @@
                 if (key_add || key_set) {
                     if (key_sum) code += '        ksum += lazy.val * sz;\n'
                 }
-                code += '    }\n'
-                code += "\n";
+                code += '    }\n\n'
             }
-            code += `    Value operator+(const Value& oth) const {\n` +
-                "        Value res {};\n";
-            if (range_sum) code += "        res.sum = sum + oth.sum;\n";
-            if (range_max) code += "        res.mx = std::max(mx, oth.mx);\n";
-            if (range_min) code += "        res.mn = std::min(mn, oth.mn);\n";
-            if (key_sum) code += "        res.ksum = ksum + oth.ksum;\n";
-            code += "        return res;\n" +
-                "    }\n" +
-                "};\n\n";
 
-            code += '\n';
+            if (range_agg) {
+                code += `    Value operator+(const Value& oth) const {\n` +
+                    "        Value res {};\n";
+                if (range_sum) code += "        res.sum = sum + oth.sum;\n";
+                if (range_max) code += "        res.mx = std::max(mx, oth.mx);\n";
+                if (range_min) code += "        res.mn = std::min(mn, oth.mn);\n";
+                if (key_sum) code += "        res.ksum = ksum + oth.ksum;\n";
+                code += "        return res;\n" +
+                    "    }\n"
+            }
+            code += "};\n\n";
+
 
             let val_id = [];
             if (range_sum) val_id.push("0")
@@ -665,8 +709,9 @@
             }
             if (enable_value) {
                 params.push('Value val')
-                bruh.push('val(val), agg(val)')
+                bruh.push('val(val)')
             }
+            if (range_agg) bruh.push('agg(val)')
 
             // default constructor
             if (params.length > 0) {
@@ -692,7 +737,12 @@
             code += '        l = r = nullptr;\n'
             if (par_option) code += '        par = nullptr;\n'
             if (key_sum) code += '        val.ksum = agg.ksum = 0;\n'
-            code += '    }\n'
+            code += '    }\n\n'
+
+            code += '    ~Node() {\n' +
+                '        delete l;\n' +
+                '        delete r;\n' +
+                '    }\n'
 
             code += "};\n\n"
         }
@@ -704,8 +754,8 @@
         if (push) {
             code += "void push(ptr n) {\n"
             if (lazy_prop) {
-                code += `    n->val.upd(n->lazy${size_option ? ', 1' : ''});\n` +
-                    `    n->agg.upd(n->lazy${size_option ? ', sz(n)' : ''});\n`
+                if (val_type !== "none") code += `    n->val.upd(n->lazy${size_option ? ', 1' : ''});\n`
+                if (range_agg) code += `    n->agg.upd(n->lazy${size_option ? ', sz(n)' : ''});\n`
                 if (range_reverse) code += '    if (n->lazy.rev) std::swap(n->l, n->r);\n'
                 code += "    if (n->l) n->l->lazy += n->lazy;\n" +
                     "    if (n->r) n->r->lazy += n->lazy;\n" +
@@ -815,7 +865,7 @@
         }
 
         if (del_option) {
-            if (comments) code += 'void del(ptr& n, int k) {\n'
+            if (comments) code += `void del(ptr& n, ${key_type} k) {\n`
             code += '    if (!n) return;\n'
             if (push) code += '    push(n);\n'
             code += '    if (n->key == k) { n = merge(n->l, n->r); return; }\n' +
@@ -919,6 +969,30 @@
                 '}\n\n'
         }
 
+        if (range_reverse_key) {
+            if (comments) code += "// you CANNOT use the normal range update for range reverses\n"
+            code += `void reverse(ptr& n, ${key_type} lo, ${key_type} hi) {\n`
+            code += `    auto [lm, r] = split(n, hi${incexc ? "" : " + 1"});\n` +
+                `    auto [l, m] = split(lm, lo${incexc ? "" : " + 1"});\n` +
+                '    Lazy upd = lid;\n' +
+                '    upd.rev = true;\n' +
+                '    if (m) m->lazy += upd;\n' +
+                '    n = merge(merge(l, m), r);\n' +
+                '}\n\n'
+        }
+
+        if (range_reverse_index) {
+            if (comments) code += "// you CANNOT use the normal range update for range reverses\n"
+            code += 'void reversei(ptr& n, int lo, int hi) {\n'
+            code += `    auto [lm, r] = spliti(n, hi${incexc ? "" : " + 1"});\n` +
+                `    auto [l, m] = spliti(lm, lo${incexc ? "" : " + 1"});\n` +
+                '    Lazy upd = lid;\n' +
+                '    upd.rev = true;\n' +
+                '    if (m) m->lazy += upd;\n' +
+                '    n = merge(merge(l, m), r);\n' +
+                '}\n\n'
+        }
+
         if (range_update_key) {
             code += `void upd(ptr& n, ${key_type} lo, ${key_type} hi, Lazy lazy) {\n` +
                 `    auto [lm, r] = split(n, ${incexc ? 'hi' : 'hi + 1'});\n` +
@@ -932,8 +1006,8 @@
             code += 'void updi(ptr n, int lo, int hi, Lazy lazy) {\n' +
                 '    if (!n) return;\n'
             if (push) code += '    push(n);\n'
-            code += `    if (lo >= n->sz || hi <${incexc ? '=' : ''} 0) return;\n` +
-                `    if (lo <= 0 && n->sz${incexc ? '' : ' - 1'} <= hi) {\n` +
+            code += `    if (lo >= n->sz || hi <${incexc ? '=' : ''} 0${treap_beats ? " || n->agg.can_break(lazy)" : ""}) return;\n` +
+                `    if (lo <= 0 && n->sz${incexc ? '' : ' - 1'} <= hi${treap_beats ? " && n->agg.can_tag(lazy)" : ""}) {\n` +
                 '        n->lazy += lazy;\n'
             if (push) code += '        push(n);\n'
             code += '        return;\n' +
@@ -961,7 +1035,7 @@
             if (push) code += '    push(n);\n'
             code += `    if (lo <= 0 && sz(n)${incexc ? '' : ' - 1'} <= hi) return n->agg;\n` +
                 `    return queryi(n->l, lo, hi) + (lo <= sz(n->l) && sz(n->l) <${incexc ? '' : '='} hi ? n->val : vid) + queryi(n->r, lo - 1 - sz(n->l), hi - 1 - sz(n->l));\n` +
-                '}\n\n  '
+                '}\n\n'
         }
 
         if (clean_option) {
@@ -979,6 +1053,13 @@
                 '    if (from == n->r || !from) res += sz(n->l) + 1;\n' +
                 '    return res;\n' +
                 '}\n\n';
+        }
+
+        if (root_option) {
+            code += "ptr root(ptr n) {\n" +
+                "    while (n->par) n = n->par;\n" +
+                "    return n;\n" +
+                "}\n\n"
         }
 
         if (heapify_option) {
@@ -1009,7 +1090,7 @@
                 'void tour(ptr n, Op op) {\n' +
                 '    std::stack<ptr> stk;\n' +
                 '    while (n || !stk.empty()) {\n'
-            code += `        for (; ${push ? 'push(n)' : 'n'}; n = n->l) stk.push(n);\n`
+            code += `        for (; n; n = n->l) ${push ? "push(n), " : ""}stk.push(n);\n`
             code += '        n = stk.top(); stk.pop();\n' +
                 '        op(n);\n' +
                 '        n = n->r;\n' +
@@ -1032,7 +1113,7 @@
             if (use_ll_typedef) prefix += "using ll = long long;\n\n"
             code = prefix + code
             if (template) {
-                code += 'main() {\n' +
+                code += '\n\nmain() {\n' +
                     '    cin.tie(0)->sync_with_stdio(0);\n' +
                     '    \n' +
                     '}\n'
