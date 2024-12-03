@@ -378,7 +378,7 @@
         });
 
         if (element.tagName === "SELECT") {
-            element.value = element.options[1].value;
+            if (element.value === element.options[0].value) element.value = element.options[1].value;
         } else if (element.type === "checkbox") {
             element.checked = true;
         }
@@ -702,12 +702,11 @@
         code += '\n'
 
         if (push) {
-            code += "void push(ptr n) {\n" +
-                "    if (!n) return;\n"
+            code += "void push(ptr n) {\n"
             if (lazy_prop) {
                 code += `    n->val.upd(n->lazy${size_option ? ', 1' : ''});\n` +
                     `    n->agg.upd(n->lazy${size_option ? ', sz(n)' : ''});\n`
-                if (range_reverse) code += '    std::swap(n->l, n->r);\n'
+                if (range_reverse) code += '    if (n->lazy.rev) std::swap(n->l, n->r);\n'
                 code += "    if (n->l) n->l->lazy += n->lazy;\n" +
                     "    if (n->r) n->r->lazy += n->lazy;\n" +
                     "    n->lazy = lid;\n"
@@ -719,7 +718,10 @@
             code += 'ptr pull(ptr n) {\n' +
                 '    if (!n) return nullptr;\n'
 
-            if (push) code += '    push(n->l), push(n->r);\n'
+            if (push) {
+                code += '    if (n->l) push(n->l);\n' +
+                    '    if (n->r) push(n->r);\n'
+            }
             if (par_option) code += '    if (n->l) n->l->par = n;\n' +
                 '    if (n->r) n->r->par = n;\n'
             if (size_option) code += '    n->sz = sz(n->l) + 1 + sz(n->r);\n'
@@ -799,31 +801,28 @@
         }
 
         if (ins_option) {
-            if (comments) code += '// returns root of new treap. only insert single nodes\n'
-            code += 'ptr ins(ptr n, ptr it) {\n' +
-                '    if (!n) return it;\n'
-            if (push) code += '    push(n);\n'
+            if (comments) code += '// only insert single nodes\n'
+            code += 'void ins(ptr& n, ptr it) {\n' +
+                '    if (!n) { n = it; return; }\n'
+            if (push) '    push(n);\n'
             code += '    if (n->pri < it->pri) {\n' +
                 '        auto [l, r] = split(n, it->key);\n' +
-                '        it->l = l, it->r = r;\n' +
-                `        return ${pull ? 'pull(it)' : 'it'};\n` +
-                '    }\n' +
-                '    if (it->key <= n->key) n->l = ins(n->l, it);\n' +
-                '    else n->r = ins(n->r, it);\n' +
-                `    return ${pull ? 'pull(n)' : 'n'};\n` +
-                '}\n\n'
+                '        it->l = l, it->r = r, n = it;\n' +
+                '    } else if (it->key <= n->key) ins(n->l, it);\n' +
+                '    else ins(n->r, it);\n'
+            if (pull) code += '    pull(n);\n'
+            code += '}\n\n'
         }
 
         if (del_option) {
-            if (comments) code += "// returns root of new treap\n"
-            code += `ptr del(ptr n, ${key_type} k) {\n` +
-                '    if (!n) return nullptr;\n'
+            if (comments) code += 'void del(ptr& n, int k) {\n'
+            code += '    if (!n) return;\n'
             if (push) code += '    push(n);\n'
-            code += '    if (n->key == k) return merge(n->l, n->r);\n' +
-                '    if (k <= n->key) n->l = del(n->l, k);\n' +
-                '    else n->r = del(n->r, k);\n' +
-                `    return ${pull ? 'pull(n)' : 'n'};\n` +
-                '}\n\n'
+            code += '    if (n->key == k) { n = merge(n->l, n->r); return; }\n' +
+                '    if (k <= n->key) del(n->l, k);\n' +
+                '    else del(n->r, k);\n'
+            if (pull) '    pull(n);\n'
+            code += '}\n\n'
         }
 
         if (spliti_option) {
@@ -854,30 +853,27 @@
         }
 
         if (insi_option) {
-            if (comments) code += "// inserts node such that it will be at index i. returns root of new treap. only insert single nodes\n"
-            code += 'ptr insi(ptr n, ptr it, int i) {\n' +
-                '    if (!n) return it;\n'
+            if (comments) code += '// inserts node such that it will be at index i. only insert single nodes\n'
+            code += 'void insi(ptr& n, ptr it, int i) {\n' +
+                '    if (!n) { n = it; return; }\n'
             if (push) code += '    push(n);\n'
             code += '    if (n->pri < it->pri) {\n' +
                 '        auto [l, r] = spliti(n, i);\n' +
-                '        it->l = l, it->r = r;\n' +
-                `        return ${pull ? 'pull(it)' : 'it'};\n` +
-                '    }\n' +
-                '    if (i <= sz(n->l)) n->l = insi(n->l, it, i);\n' +
-                '    else n->r = insi(n->r, it, i - 1 - sz(n->l));\n' +
-                `    return ${pull ? 'pull(n)' : 'n'};\n` +
+                '        it->l = l, it->r = r, n = it;\n' +
+                '    } else if (i <= sz(n->l)) insi(n->l, it, i);\n' +
+                '    else insi(n->r, it, i - 1 - sz(n->l));\n' +
+                '    pull(n);\n' +
                 '}\n\n'
         }
 
         if (deli_option) {
-            if (comments) code += "// returns root of new treap\n"
-            code += 'ptr deli(ptr n, int i) {\n' +
-                '    if (!n) return nullptr;\n'
+            code += 'void deli(ptr& n, int i) {\n' +
+                '    if (!n) return;\n'
             if (push) code += '    push(n);\n'
-            code += '    if (i == sz(n->l)) return merge(n->l, n->r);\n' +
-                '    if (i <= sz(n->l)) n->l = deli(n->l, i);\n' +
-                '    else n->r = deli(n->r, i - 1 - sz(n->l));\n' +
-                `    return ${pull ? 'pull(n)' : 'n'};\n` +
+            code += '    if (i == sz(n->l)) { n = merge(n->l, n->r); return; }\n' +
+                '    if (i <= sz(n->l)) deli(n->l, i);\n' +
+                '    else deli(n->r, i - 1 - sz(n->l));\n' +
+                '    pull(n);\n' +
                 '}\n\n'
         }
 
