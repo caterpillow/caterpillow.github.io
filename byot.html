@@ -330,6 +330,7 @@ Warnings:
         ["three_spliti_option", "spliti_option"],
         ["treap_beats", "range_agg"],
         ["treap_beats", "lazy_prop"],
+        ["treap_beats", "range_update_index"],
         ["val_type", "enable_value"],
         ["range_agg", "enable_value"],
         ["root_option", "par_option"]
@@ -524,6 +525,9 @@ Warnings:
         }
         if (n_merge_option) {
             addWarning("Merge with 5+ arguments will conflict with std::merge. Do Treap::merge(...) for 5 or more arguments.")
+        }
+        if (range_reverse && (range_update_key || range_update_index)) {
+            addWarning("You must use the dedicated range reverse function to perform range reversals. Otherwise, it will not work.")
         }
     }
     function displayWarnings() {
@@ -993,7 +997,7 @@ Warnings:
                 '}\n\n'
         }
 
-        if (range_update_key) {
+        if (range_update_key && !treap_beats) {
             code += `void upd(ptr& n, ${key_type} lo, ${key_type} hi, Lazy lazy) {\n` +
                 `    auto [lm, r] = split(n, ${incexc ? 'hi' : 'hi + 1'});\n` +
                 '    auto [l, m] = split(lm, lo);\n' +
@@ -1016,6 +1020,15 @@ Warnings:
                 '    updi(n->l, lo, hi, lazy);\n' +
                 '    updi(n->r, lo - 1 - sz(n->l), hi - 1 - sz(n->l), lazy);\n' +
                 '    pull(n);\n' +
+                '}\n\n'
+        }
+
+        if (range_update_key && treap_beats) {
+            code += `void upd(ptr& n, ${key_type} lo, ${key_type} hi, Lazy lazy) {\n` +
+                `    auto [lm, r] = split(n, ${incexc ? 'hi' : 'hi + 1'});\n` +
+                '    auto [l, m] = split(lm, lo);\n' +
+                '    updi(m, 0, sz(m), lazy);\n' +
+                '    n = merge(l, merge(m, r));\n' +
                 '}\n\n'
         }
 
