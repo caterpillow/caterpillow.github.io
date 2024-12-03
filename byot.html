@@ -289,7 +289,6 @@
         ["range_sum", "range_agg"],
         ["range_max", "range_agg"],
         ["range_min", "range_agg"],
-        ["lazy_prop", "range_agg"],
         ["key_sum", "range_agg"],
         ["plus_merge_option", "merge_option"],
         ["order_option", "par_option"],
@@ -883,18 +882,16 @@
         }
 
         if (min_option) {
-            code += 'ptr mn(ptr n) {\n' +
-                '    if (!n) return nullptr;\n'
+            code += 'ptr mn(ptr n) {\n'
             if (push) code += '    push(n);\n'
-            code += '    return std::max(n, mn(n->l));\n' +
+            code += '    return n->l ? mn(n->l) : n;\n' +
                 '}\n\n'
         }
 
         if (max_option) {
-            code += 'ptr mx(ptr n) {\n' +
-                '    if (!n) return nullptr;\n'
+            code += 'ptr mx(ptr n) {\n'
             if (push) code += '    push(n);\n'
-            code += '    return std::max(n, mn(n->r));\n' +
+            code += '    return n->r ? mx(n->r) : n;\n' +
                 '}\n\n'
         }
 
@@ -1015,9 +1012,9 @@
             code += 'template <typename Op>\n' +
                 'void tour(ptr n, Op op) {\n' +
                 '    std::stack<ptr> stk;\n' +
-                '    while (n || !stk.empty()) {\n' +
-                '        for (; n; n = n->l) stk.push(n);\n' +
-                '        n = stk.top(); stk.pop();\n' +
+                '    while (n || !stk.empty()) {\n'
+            code += `        for (; ${push ? 'push(n)' : 'n'}; n = n->l) stk.push(n);\n`
+            code += '        n = stk.top(); stk.pop();\n' +
                 '        op(n);\n' +
                 '        n = n->r;\n' +
                 '    }\n' +
