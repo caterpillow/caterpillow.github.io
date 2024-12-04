@@ -19,11 +19,13 @@
     Usage: click on stuff u want, don't click on stuff you don't want. <br>
     You can right click a disabled checkbox/dropdown to enable all its prerequisites. <br>
     Half this site is written by ChatGPT so don't judge too harshly. <br>
-    If you have any suggestions or find any bugs (highly likely), my discord is caterpillow<br>
+    If you have any suggestions or find any bugs (highly likely), leave a comment on the blog. <br>
     <br>
     See the <a href="https://codeforces.com/blog/entry/136858" target="_blank">codeforces blog post</a> for usage examples.
+    <br>
 </div>
 <hr>
+
 
 <style>
     .container {
@@ -105,6 +107,7 @@
             <label><input type="checkbox" id="find_option"> Include find</label><br>
             <label><input type="checkbox" id="ins_option"> Include point insert</label><br>
             <label><input type="checkbox" id="del_option"> Include point deletion</label><br>
+            <label><input type="checkbox" id="mod_option"> Include point modification</label><br>
         </div>
         <hr>
 
@@ -116,6 +119,16 @@
             <label><input type="checkbox" id="findi_option"> Include find by index</label><br>
             <label><input type="checkbox" id="insi_option"> Include point insert by index</label><br>
             <label><input type="checkbox" id="deli_option"> Include point deletion by index</label><br>
+            <label><input type="checkbox" id="modi_option"> Include point modification by index</label><br>
+            <label><input type="checkbox" id="rot_option"> Include rotation</label><br>
+        </div>
+        <hr>
+
+        <div>
+            <label><input type="checkbox" id="partition_key"> Find partition key </label><br>
+            <label><input type="checkbox" id="partition_index"> Find partition index </label><br>
+            <label><input type="checkbox" id="cumulative_partition_key"> Find cumulative partition key </label><br>
+            <label><input type="checkbox" id="cumulative_partition_index"> Find cumulative partition index </label><br>
         </div>
     </div>
 
@@ -191,10 +204,13 @@
             <label><input type="checkbox" id="order_option"> Include order (finds index of a node)</label><br>
             <label><input type="checkbox" id="root_option"> Include root (returns the root of some treap node)</label><br>
         </div>
+        <hr>
+
+        <div>
+            <label><input type="checkbox" id="treap_beats"> Enable treap beats template</label><br>
+        </div>
     </div>
 </div>
-<hr>
-<label><input type="checkbox" id="treap_beats"> Enable treap beats template</label><br>
 <hr>
 Warnings:
 <!-- Warning area -->
@@ -266,6 +282,14 @@ Warnings:
     let namespace_treap = false;
     let treap_beats = false;
     let root_option = false;
+    let rot_option = false;
+    let mod_option = false;
+    let modi_option = false;
+
+    let partition_key = false;
+    let partition_index = false;
+    let cumulative_partition_key = false;
+    let cumulative_partition_index = false;
 
 
     // Static dependencies graph
@@ -332,7 +356,17 @@ Warnings:
         ["treap_beats", "range_update_index"],
         ["val_type", "enable_value"],
         ["range_agg", "enable_value"],
-        ["root_option", "par_option"]
+        ["root_option", "par_option"],
+        ["rot_option", "spliti_option"],
+        ["rot_option", "merge_option"],
+        ["mod_option", "key_type"],
+        ["modi_option", "size_option"],
+        ["partition_key", "key_type"],
+        ["partition_index", "size_option"],
+        ["cumulative_partition_key", "key_type"],
+        ["cumulative_partition_key", "range_agg"],
+        ["cumulative_partition_index", "size_option"],
+        ["cumulative_partition_index", "range_agg"]
     ];
 
     const sortedDependencies = topsort(edges);
@@ -504,6 +538,13 @@ Warnings:
         treap_beats = document.getElementById("treap_beats").checked;
         enable_value = document.getElementById("enable_value").checked;
         root_option = document.getElementById("root_option").checked;
+        rot_option = document.getElementById("rot_option").checked;
+        mod_option = document.getElementById("mod_option").checked;
+        modi_option = document.getElementById("modi_option").checked;
+        partition_key = document.getElementById("partition_key").checked;
+        partition_index = document.getElementById("partition_index").checked;
+        cumulative_partition_key = document.getElementById("cumulative_partition_key").checked;
+        cumulative_partition_index = document.getElementById("cumulative_partition_index").checked;
 
 
         clearWarnings();
@@ -868,13 +909,27 @@ Warnings:
         }
 
         if (del_option) {
-            if (comments) code += `void del(ptr& n, ${key_type} k) {\n`
-            code += '    if (!n) return;\n'
+            if (comments) code += '// returns pointer to deleted node\n'
+            code += `ptr del(ptr& n, ${key_type} k) {\n` +
+                '    if (!n) return nullptr;\n'
             if (push) code += '    push(n);\n'
-            code += '    if (n->key == k) { n = merge(n->l, n->r); return; }\n' +
-                '    if (k <= n->key) del(n->l, k);\n' +
-                '    else del(n->r, k);\n'
-            if (pull) '    pull(n);\n'
+            code += '    if (n->key == k) { ptr ret = n; n = merge(n->l, n->r); return ret; }\n' +
+                '    ptr ret = k <= n->key ? del(n->l, k) : del(n->r, k);\n'
+            if (pull) code += '    pull(n);\n'
+            code += '    return ret;\n' +
+                '}\n\n'
+        }
+
+        if (mod_option) {
+            if (comments) code += '// performs an arbitrary operation on some node\n'
+            code += 'template <typename Op>\n' +
+                `void modify(ptr n, ${key_type} k, Op op) {\n` +
+                '    if (!n) return;\n'
+            if (push) code += '    push(n);\n'
+            code += '    if (n->key == k) op(n);\n' +
+                '    else if (k <= n->key) modify(n->l, k, op);\n' +
+                '    else modify(n->r, k, op);\n'
+            if (pull) code += '    pull(n);\n'
             code += '}\n\n'
         }
 
@@ -920,13 +975,83 @@ Warnings:
         }
 
         if (deli_option) {
-            code += 'void deli(ptr& n, int i) {\n' +
+            if (comments) code += '// returns pointer to deleted node\n'
+            code += 'ptr deli(ptr& n, int i) {\n' +
+                '    if (!n) return nullptr;\n'
+            if (push) code += '    push(n);\n'
+            code += '    if (i == sz(n->l)) { ptr ret = n; n = merge(n->l, n->r); return ret; }\n' +
+                '    ptr ret = i <= sz(n->l) ? deli(n->l, i) : deli(n->r, i - 1 - sz(n->l));\n'
+            if (pull) code += '    pull(n);\n'
+            code += '    return ret;\n' +
+                '}\n\n'
+        }
+
+        if (modi_option) {
+            if (comments) code += '// performs an arbitrary operation on some node\n'
+            code += 'template <typename Op>\n' +
+                'void modifyi(ptr n, int i, Op op) {\n' +
                 '    if (!n) return;\n'
             if (push) code += '    push(n);\n'
-            code += '    if (i == sz(n->l)) { n = merge(n->l, n->r); return; }\n' +
-                '    if (i <= sz(n->l)) deli(n->l, i);\n' +
-                '    else deli(n->r, i - 1 - sz(n->l));\n' +
-                '    pull(n);\n' +
+            code += '    if (sz(n->l) == i) op(n);\n' +
+                '    else if (i <= sz(n->l)) modifyi(n->l, i, op);\n' +
+                '    else modifyi(n->r, i - 1 - sz(n->l), op);\n'
+            if (pull) code += '    pull(n);\n'
+            code += '}\n\n'
+        }
+
+        if (rot_option) {
+            if (comments) code += '// rotates treap such that index i is at the start\n'
+            code +='void rotate(ptr& n, int i) {\n' +
+                '    auto [l, r] = spliti(n, i);\n' +
+                '    n = merge(r, l);\n' +
+                '}\n\n'
+        }
+
+        if (partition_key) {
+            if (comments) code += "// finds smallest key such that pred returns false\n"
+            code += "template<typename Pred>\n" +
+                `${key_type} partition_key(ptr n, Pred pred) {\n`
+            if (push) code += "    push(n);\n"
+            code += "    if (pred(n)) return n->r ? partition_key(n->r, pred) : n->key + 1;\n" +
+                "    else return n->l ? partition_key(n->l, pred) : n->key;\n" +
+                "}\n\n"
+        }
+
+        if (partition_index) {
+            if (comments) code += '// find smallest index such that pred returns false\n'
+            code += 'template<typename Pred>\n' +
+                'int partition_index(ptr n, Pred pred) {\n' +
+                '    if (!n) return 0;\n'
+            if (push) code += '    push(n)\n'
+            code += '    if (pred(n)) return sz(n->l) + 1 + partition_index(n->r, pred);\n' +
+                '    else return partition_index(n->l, pred);\n' +
+                '}\n\n'
+        }
+
+        if (cumulative_partition_key) {
+            if (comments) code += '// given a predicate that will return true for some prefix of aggregates,\n' +
+                '// find the key of the first prefix aggregate makes the predicate false (max key + 1 if always true)\n' +
+                '// eg. find the smallest prefix that has sum > x\n'
+            code += 'template <typename Pred>\n' +
+                `${key_type} cumulative_partition_key(ptr n, Pred pred, Value acc = vid) {\n`
+            if (push) code += '    push(n);\n'
+            code += '    if (!pred(acc + agg(n->l))) return n->l ? cumulative_partition_key(n->l, pred, acc) : n->key;\n' +
+                '    if (!pred(acc = acc + agg(n->l) + n->val)) return n->key;\n' +
+                '    return n->r ? cumulative_partition_key(n->r, pred, acc) : n->key + 1;\n' +
+                '}\n\n'
+        }
+
+        if (cumulative_partition_index) {
+            if (comments) code += '// given a predicate that will return true for some prefix of aggregates,\n' +
+                '// find the index of the first prefix aggregate that makes the predicate false (sz(n) if always true)\n' +
+                '// eg. find the smallest prefix that has sum > x\n'
+            code += 'template <typename Pred>\n' +
+                'int cumulative_partition_index(ptr n, Pred pred, Value acc = vid) {\n' +
+                '    if (!n) return 0;\n'
+            if (push) code += '    push(n);\n'
+            code += '    if (!pred(acc + agg(n->l))) return cumulative_partition_index(n->l, pred, acc);\n' +
+                '    if (!pred(acc = acc + agg(n->l) + n->val)) return sz(n->l);\n' +
+                '    return sz(n->l) + 1 + cumulative_partition_index(n->r, pred, acc);\n' +
                 '}\n\n'
         }
 
