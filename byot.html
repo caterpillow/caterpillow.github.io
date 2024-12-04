@@ -107,6 +107,7 @@
             <label><input type="checkbox" id="find_option"> Include find</label><br>
             <label><input type="checkbox" id="ins_option"> Include point insert</label><br>
             <label><input type="checkbox" id="del_option"> Include point deletion</label><br>
+            <label><input type="checkbox" id="del_all_option"> Include multi key deletion</label><br>
             <label><input type="checkbox" id="mod_option"> Include point modification</label><br>
         </div>
         <hr>
@@ -237,6 +238,7 @@ Warnings:
     let find_option = false;
     let ins_option = false;
     let del_option = false;
+    let del_all_option = false;
     let size_option = false;
     let spliti_option = false;
     let findi_option = false;
@@ -347,6 +349,9 @@ Warnings:
         ["range_reverse_key", "split_option"],
         ["range_reverse_index", "spliti_option"],
         ["del_option", "merge_option"],
+        ["del_all_option", "split_option"],
+        ["del_all_option", "merge_option"],
+        ["del_all_option", "key_type"],
         ["deli_option", "merge_option"],
         ["deli_option", "size_option"],
         ["three_split_option", "split_option"],
@@ -497,6 +502,7 @@ Warnings:
         findi_option = document.getElementById("findi_option").checked;
         ins_option = document.getElementById("ins_option").checked;
         del_option = document.getElementById("del_option").checked;
+        del_all_option = document.getElementById("del_all_option").checked;
         size_option = document.getElementById("size_option").checked;
         spliti_option = document.getElementById("spliti_option").checked;
         three_spliti_option = document.getElementById("three_spliti_option").checked;
@@ -798,7 +804,7 @@ Warnings:
         if (push) {
             code += "void push(ptr n) {\n"
             if (lazy_prop) {
-                if (val_type !== "none") code += `    n->val.upd(n->lazy${size_option ? ', 1' : ''});\n`
+                if (enable_value) code += `    n->val.upd(n->lazy${size_option ? ', 1' : ''});\n`
                 if (range_agg) code += `    n->agg.upd(n->lazy${size_option ? ', sz(n)' : ''});\n`
                 if (range_reverse) code += '    if (n->lazy.rev) std::swap(n->l, n->r);\n'
                 code += "    if (n->l) n->l->lazy += n->lazy;\n" +
@@ -917,6 +923,16 @@ Warnings:
                 '    ptr ret = k <= n->key ? del(n->l, k) : del(n->r, k);\n'
             if (pull) code += '    pull(n);\n'
             code += '    return ret;\n' +
+                '}\n\n'
+        }
+
+        if (del_all_option) {
+            if (comments) code += '// removes all nodes with given key, and returns it in one big treap\n'
+            code += `ptr del_all(ptr& n, ${key_type} k) {\n` +
+                '    auto [lm, r] = split(n, k + 1);\n' +
+                '    auto [l, m] = split(lm, k);\n' +
+                '    n = merge(l, r);\n' +
+                '    return m;\n' +
                 '}\n\n'
         }
 
@@ -1211,7 +1227,7 @@ Warnings:
 
         if (build_option) {
             code += 'ptr build(std::vector<ptr>& ns, int l = 0, int r = -69) {\n' +
-                '    if (r == -69) r = (int) ns.size() - 1;\n' +
+                '    if (r == -69) r = (int) size(ns) - 1;\n' +
                 '    if (l > r) return nullptr;\n' +
                 '    if (l == r) return ns[l];\n' +
                 '    int m = (l + r) / 2;\n' +
