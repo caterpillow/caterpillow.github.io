@@ -1,0 +1,1482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BYOT!</title>
+    <style>
+        .warning {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+<h1>Build your own treap!</h1>
+
+<!-- Instructions -->
+<div>
+    Usage: click on stuff u want, don't click on stuff you don't want. <br>
+    You can right click a disabled checkbox/dropdown to enable all its prerequisites. <br>
+    Half this site is written by ChatGPT so don't judge too harshly. <br>
+    If you have any suggestions or find any bugs (highly likely), leave a comment on the blog. <br>
+    <br>
+    See the <a href="https://codeforces.com/blog/entry/136858" target="_blank">codeforces blog post</a> for usage examples.
+    <br>
+</div>
+<hr>
+<a href="https://caterpillow.github.io/byot">Basic treap</a>&nbsp;&nbsp;&nbsp;&nbsp;<a href="https://caterpillow.github.io/byot2">Array-based treap</a>
+<hr>
+<style>
+    .container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+    }
+    .column {
+        flex: 1;
+        min-width: 300px; /* Adjust based on preference */
+    }
+    .column div {
+        margin-bottom: 20px; /* Space between sections */
+    }
+</style>
+
+<div class="container">
+    <!-- Column 1 -->
+    <div class="column">
+        <!-- Misc -->
+        <div>
+            <label><input type="checkbox" id="signature" checked> Include site tag (pls)</label><br>
+            <label><input type="checkbox" id="comments" checked> Include comments</label><br>
+            <label><input type="checkbox" id="template"> Include template (for testing)</label><br>
+        </div>
+        <hr>
+
+        <!-- Namespace and typedef options -->
+        <div>
+            <label><input type="checkbox" id="use_namespace_std" checked> Use namespace std</label><br>
+            <label><input type="checkbox" id="use_ll_typedef" checked> Use ll = long long</label><br>
+            <label><input type="checkbox" id="namespace_treap"> Wrap in namespace Treap</label><br>
+        </div>
+        <hr>
+
+        <!-- Tab character selection -->
+        <div>
+            <label for="tab_char">Choose tab character:</label>
+            <select id="tab_char">
+                <option value="2spaces">2 spaces</option>
+                <option value="3spaces">3 spaces</option>
+                <option value="4spaces" selected>4 spaces</option>
+                <option value="8spaces">8 spaces (wtf)</option>
+                <option value="tab">Tab</option>
+            </select>
+        </div>
+        <hr>
+
+        <!-- Range type -->
+        <div>
+            <label for="range_type">Choose range type:</label>
+            <select id="range_type">
+                <option value="inc exc" selected>inc exc</option>
+                <option value="inc inc">inc inc</option>
+            </select>
+        </div>
+        <hr>
+
+        <div>
+            Reserved nodes (0 for dynamic)<br>
+            <input type="number" id="mem_size" min="0" step="1" value="0" required><br>
+            <label><input type="checkbox" id="optimise"> Enable cursed optimisation (may improve runtime)</label><br>
+        </div>
+        <hr>
+
+        <!-- Merge option -->
+        <div>
+            <label><input type="checkbox" id="merge_option"> Include merge</label><br>
+            <label><input type="checkbox" id="n_merge_option"> Include n-way merge</label><br>
+        </div>
+        <hr>
+
+        <!-- Key type selection (none, int, long long) -->
+        <div>
+            <label for="key_type">Choose key type:</label>
+            <select id="key_type">
+                <option value="none">None</option>
+                <option value="int">int</option>
+                <option value="long long">long long</option>
+                <option value="T">T</option>
+            </select>
+            <br>
+            <label><input type="checkbox" id="split_option"> Include split</label><br>
+            <label><input type="checkbox" id="three_split_option"> Include 3-way split</label><br>
+            <label><input type="checkbox" id="find_option"> Include find</label><br>
+            <label><input type="checkbox" id="ins_option"> Include point insert</label><br>
+            <label><input type="checkbox" id="del_option"> Include point deletion</label><br>
+            <label><input type="checkbox" id="del_all_option"> Include multi key deletion</label><br>
+            <label><input type="checkbox" id="mod_option"> Include point modification</label><br>
+        </div>
+        <hr>
+
+        <!-- Size option -->
+        <div>
+            <label><input type="checkbox" id="size_option"> Include size</label><br>
+            <label><input type="checkbox" id="spliti_option"> Include split by index</label><br>
+            <label><input type="checkbox" id="three_spliti_option"> Include 3-way split by index</label><br>
+            <label><input type="checkbox" id="findi_option"> Include find by index</label><br>
+            <label><input type="checkbox" id="insi_option"> Include point insert by index</label><br>
+            <label><input type="checkbox" id="deli_option"> Include point deletion by index</label><br>
+            <label><input type="checkbox" id="modi_option"> Include point modification by index</label><br>
+            <label><input type="checkbox" id="rot_option"> Include rotation</label><br>
+        </div>
+        <hr>
+
+        <div>
+            <label><input type="checkbox" id="partition_key"> Find partition key </label><br>
+            <label><input type="checkbox" id="partition_index"> Find partition index </label><br>
+            <label><input type="checkbox" id="cumulative_partition_key"> Find cumulative partition key </label><br>
+            <label><input type="checkbox" id="cumulative_partition_index"> Find cumulative partition index </label><br>
+        </div>
+    </div>
+
+    <!-- Column 2 -->
+    <div class="column">
+
+        <!-- More misc -->
+        <div>
+            <label><input type="checkbox" id="max_option"> Include max</label><br>
+            <label><input type="checkbox" id="min_option"> Include min</label><br>
+            <label><input type="checkbox" id="unite_option"> Include treap union (amortization)</label><br>
+            <label><input type="checkbox" id="unite_fast_option"> Include treap union (brute)</label><br>
+            <label><input type="checkbox" id="heapify_option"> Include heapify</label><br>
+            <label><input type="checkbox" id="build_option"> Include build</label><br>
+            <label><input type="checkbox" id="build_inplace"> Include build inplace</label><br>
+            <label><input type="checkbox" id="tour_option"> Include tour</label><br>
+        </div>
+        <hr>
+
+        <!-- Dropdown for value type -->
+        <div>
+            <label><input type="checkbox" id="enable_value"> Enable value</label><br>
+        </div>
+        <hr>
+
+        <!-- Range aggregates -->
+        <div>
+            <label for="val_type">Choose value type:</label>
+            <select id="val_type">
+                <option value="none">None</option>
+                <option value="int">int</option>
+                <option value="long long">long long</option>
+            </select><br>
+            <label><input type="checkbox" id="range_agg"> Include range aggregates</label><br>
+            <label><input type="checkbox" id="range_sum"> Include range sum</label><br>
+            <label><input type="checkbox" id="range_max"> Include range max</label><br>
+            <label><input type="checkbox" id="range_min"> Include range min</label><br>
+            <br>
+            <label><input type="checkbox" id="key_sum"> Include key sum</label><br>
+        </div>
+        <hr>
+
+        <!-- Lazy propagation -->
+        <div>
+            <label><input type="checkbox" id="lazy_prop"> Include lazy propagation</label><br>
+            <label><input type="checkbox" id="range_reverse_key"> Include range reverse (key)</label><br>
+            <label><input type="checkbox" id="range_reverse_index"> Include range reverse (index)</label><br>
+            <label><input type="checkbox" id="range_add"> Include range add</label><br>
+            <label><input type="checkbox" id="range_set"> Include range set</label><br>
+            <br>
+            <label><input type="checkbox" id="key_add"> Include key add</label><br>
+            <label><input type="checkbox" id="key_set"> Include key set</label><br>
+        </div>
+        <hr>
+
+        <!-- Range updates -->
+        <div>
+            <label><input type="checkbox" id="range_update_key"> Include range updates (key)</label><br>
+            <label><input type="checkbox" id="range_update_index"> Include range updates (index)</label><br>
+        </div>
+        <hr>
+
+        <!-- Range queries -->
+        <div>
+            <label><input type="checkbox" id="range_query_key"> Include range queries (key)</label><br>
+            <label><input type="checkbox" id="range_query_index"> Include range queries (index)</label><br>
+        </div>
+        <hr>
+
+        <!-- Parent pointer stuff -->
+        <div>
+            <label><input type="checkbox" id="par_option"> Include parent pointers</label><br>
+            <label><input type="checkbox" id="clean_option"> Include clean (given a pointer to a node, flushes all lazy tags)</label><br>
+            <label><input type="checkbox" id="order_option"> Include order (finds index of a node)</label><br>
+            <label><input type="checkbox" id="root_option"> Include root (returns the root of some treap node)</label><br>
+        </div>
+        <hr>
+
+        <div>
+            <label><input type="checkbox" id="treap_beats"> Enable treap beats template (range sums)</label><br>
+            <label><input type="checkbox" id="beats_chmin"> Include range chmin</label><br>
+            <label><input type="checkbox" id="beats_chmax"> Include range chmax</label><br>
+            <label><input type="checkbox" id="beats_add"> Include range add</label><br>
+        </div>
+    </div>
+</div>
+<hr>
+Warnings:
+<!-- Warning area -->
+<div id="warnings" class="warning"></div>
+<hr>
+
+<!-- Copy button -->
+<button onclick="copyCode()">Copy Code</button>
+<div id="copy_status"></div>
+
+<!-- Area to display the code -->
+<pre id="code_display"></pre>
+
+<script>
+    let warnings = []
+
+    let mem_size = 0;
+
+    let use_namespace_std = false;
+    let use_ll_typedef = false;
+    let merge_option = false;
+    let n_merge_option = false;
+    let key_type = 'none';
+    let split_option = false;
+    let three_split_option = false;
+    let find_option = false;
+    let ins_option = false;
+    let del_option = false;
+    let del_all_option = false;
+    let size_option = false;
+    let spliti_option = false;
+    let findi_option = false;
+    let three_spliti_option = false;
+    let insi_option = false;
+    let deli_option = false;
+    let min_option = false;
+    let max_option = false;
+    let unite_option = false;
+    let unite_fast_option = false;
+    let range_sum = false;
+    let range_max = false;
+    let range_min = false;
+    let lazy_prop = false;
+    let range_reverse = false;
+    let range_reverse_key = false;
+    let range_reverse_index = false;
+    let range_add = false;
+    let range_set = false;
+    let range_update_key = false;
+    let range_update_index = false;
+    let range_query_key = false;
+    let range_query_index = false;
+    let enable_value = false;
+    let val_type = 'none';
+    let range_type = 'inc exc'
+    let range_agg = false;
+    let signature = true;
+    let comments = true;
+    let template = false;
+
+    let par_option = false;
+    let clean_option = false;
+    let order_option = false;
+    let heapify_option = false;
+    let build_option = false;
+    let tour_option = false;
+
+    let key_sum = false;
+    let key_add = false;
+    let key_set = false;
+
+    let namespace_treap = false;
+    let root_option = false;
+    let rot_option = false;
+    let mod_option = false;
+    let modi_option = false;
+
+    let partition_key = false;
+    let partition_index = false;
+    let cumulative_partition_key = false;
+    let cumulative_partition_index = false;
+
+    let treap_beats = false;
+    let beats_chmin = false;
+    let beats_chmax = false;
+    let beats_add = false;
+
+    let optimise = false;
+    let build_inplace = false;
+
+
+    // Static dependencies graph
+    const edges = [
+        ["split_option", "key_type"],
+        ["find_option", "key_type"],
+        ["ins_option", "split_option"],
+        ["spliti_option", "size_option"],
+        ["insi_option", "spliti_option"],
+        ["findi_option", "size_option"],
+        ["n_merge_option", "merge_option"],
+        ["n_merge_option", "namespace_treap"],
+        ["range_add", "lazy_prop"],
+        ["range_set", "lazy_prop"],
+        ["key_add", "lazy_prop"],
+        ["key_set", "lazy_prop"],
+        ["range_update_key", "lazy_prop"],
+        ["range_update_key", "merge_option"],
+        ["range_update_key", "key_type"],
+        ["range_update_key", "split_option"],
+        ["range_update_index", "lazy_prop"],
+        ["range_update_index", "size_option"],
+        ["range_sum", "size_option"],
+        ["key_sum", "size_option"],
+        ["key_sum", "key_type"],
+        ["key_add", "key_type"],
+        ["key_set", "key_type"],
+        ["range_query_key", "merge_option"],
+        ["range_query_key", "key_type"],
+        ["range_query_key", "split_option"],
+        ["range_query_key", "range_agg"],
+        ["range_query_index", "size_option"],
+        ["range_query_index", "range_agg"],
+        ["range_sum", "range_agg"],
+        ["range_sum", "val_type"],
+        ["range_max", "range_agg"],
+        ["range_max", "val_type"],
+        ["range_min", "range_agg"],
+        ["range_min", "val_type"],
+        ["key_sum", "range_agg"],
+        ["order_option", "par_option"],
+        ["order_option", "size_option"],
+        ["clean_option", "par_option"],
+        ["clean_option", "lazy_prop"],
+        ["unite_option", "merge_option"],
+        ["unite_option", "split_option"],
+        ["unite_option", "min_option"],
+        ["unite_fast_option", "split_option"],
+        ["build_option", "heapify_option"],
+        ["range_reverse_key", "lazy_prop"],
+        ["range_reverse_index", "lazy_prop"],
+        ["range_reverse_key", "merge_option"],
+        ["range_reverse_index", "merge_option"],
+        ["range_reverse_key", "split_option"],
+        ["range_reverse_index", "spliti_option"],
+        ["del_option", "merge_option"],
+        ["del_all_option", "split_option"],
+        ["del_all_option", "merge_option"],
+        ["del_all_option", "key_type"],
+        ["deli_option", "merge_option"],
+        ["deli_option", "size_option"],
+        ["three_split_option", "split_option"],
+        ["three_spliti_option", "spliti_option"],
+        ["treap_beats", "range_agg"],
+        ["treap_beats", "lazy_prop"],
+        ["treap_beats", "range_update_index"],
+        ["beats_chmin", "treap_beats"],
+        ["beats_chmax", "treap_beats"],
+        ["beats_add", "treap_beats"],
+        ["val_type", "enable_value"],
+        ["range_agg", "enable_value"],
+        ["root_option", "par_option"],
+        ["rot_option", "spliti_option"],
+        ["rot_option", "merge_option"],
+        ["mod_option", "key_type"],
+        ["modi_option", "size_option"],
+        ["partition_key", "key_type"],
+        ["partition_index", "size_option"],
+        ["cumulative_partition_key", "key_type"],
+        ["cumulative_partition_key", "range_agg"],
+        ["cumulative_partition_index", "size_option"],
+        ["cumulative_partition_index", "range_agg"],
+        ["treap_beats", "val_type"],
+        ["build_inplace", "heapify_option"]
+    ];
+
+    const mutual_exclusions = [
+        ["treap_beats", "range_sum"],
+        ["treap_beats", "range_min"],
+        ["treap_beats", "range_max"],
+    ];
+
+    const sortedDependencies = topsort(edges);
+
+    document.addEventListener("DOMContentLoaded", () => {
+        initializeForm();
+        handleUpdate();
+    });
+
+    function disableBanned(id) {
+        mutual_exclusions.forEach(([id1, id2]) => {
+            if (id === id1) {
+                const el = document.getElementById(id2);
+                if (el.type === "checkbox") el.checked = false;
+                else if (el.tagName === "SELECT") el.value = el.options[0].value;
+            }
+            if (id === id2) {
+                const el = document.getElementById(id1);
+                if (el.type === "checkbox") el.checked = false;
+                else if (el.tagName === "SELECT") el.value = el.options[0].value;
+            }
+        });
+    }
+
+    function initializeForm() {
+        document.querySelectorAll("input[type='checkbox'], select").forEach(el => {
+            el.addEventListener("change", (event) => {
+                disableBanned(event.target.id)
+                handleUpdate()
+            });
+            el.addEventListener("contextmenu", (e) => {
+                e.preventDefault();
+                enableDependencies(el.id);
+            });
+        });
+        document.querySelectorAll("input[type='number']").forEach(el => {
+            el.addEventListener("input", (event) => {
+                handleUpdate();
+            });
+        });
+    }
+
+    function isEnabled(id) {
+        const element = document.getElementById(id);
+        if (element.tagName === "SELECT") {
+            return element.value !== element.options[0].value; // not the first/default option
+        }
+        return element.checked;
+    }
+
+    function applyDependencies() {
+        sortedDependencies.forEach(id => {
+            const dependencies = edges
+                .filter(pair => pair[0] === id)
+                .map(pair => pair[1]);
+
+            const allSatisfied = dependencies.every(depId => isEnabled(depId));
+            const element = document.getElementById(id);
+
+            if (element.tagName === "INPUT" && element.type === "checkbox") {
+                element.disabled = !allSatisfied;
+                if (!allSatisfied) element.checked = false;
+            }
+
+            if (element.tagName === "SELECT") {
+                element.disabled = !allSatisfied;
+                if (!allSatisfied) {
+                    element.value = element.options[0].value; // Reset to first option
+                }
+            }
+        });
+    }
+
+    function enableDependencies(id) {
+        const element = document.getElementById(id);
+
+        const reqs = edges.filter(pair => pair[0] === id).map(pair => pair[1]);
+
+        reqs.forEach(depId => {
+            const dep = document.getElementById(depId);
+
+            enableDependencies(depId);
+
+            if (dep.tagName === "INPUT" && dep.type === "checkbox" && !dep.checked) {
+                dep.checked = true;
+                disableBanned(depId);
+            }
+
+            if (dep.tagName === "SELECT" && dep.value === dep.options[0].value) {
+                dep.value = dep.options[1].value;
+                disableBanned(depId);
+            }
+
+            dep.disabled = false;
+        });
+
+        if (element.tagName === "SELECT") {
+            if (element.value === element.options[0].value) {
+                element.value = element.options[1].value;
+                disableBanned(element.id);
+            }
+        } else if (element.type === "checkbox") {
+            disableBanned(id)
+            element.checked = true;
+        }
+
+        element.disabled = false;
+
+        handleUpdate();
+    }
+
+    function topsort(pairs) {
+        let graph = {};
+        let deg = {};
+
+        pairs.forEach(([a, b]) => {
+            if (!graph[b]) graph[b] = [];
+            if (!deg[a]) deg[a] = 0;
+            if (!deg[b]) deg[b] = 0;
+
+            graph[b].push(a);
+            deg[a]++;
+        });
+
+        let sorted = [];
+        let queue = Object.keys(deg).filter(k => deg[k] === 0);
+
+        while (queue.length) {
+            let current = queue.shift();
+            sorted.push(current);
+
+            (graph[current] || []).forEach(neighbor => {
+                deg[neighbor]--;
+                if (deg[neighbor] === 0) {
+                    queue.push(neighbor);
+                }
+            });
+        }
+
+        if (sorted.length !== Object.keys(deg).length) {
+            throw new Error("Cycle detected in dependency graph!");
+        }
+
+        return sorted;
+    }
+
+    function handleUpdate() {
+        use_namespace_std = document.getElementById("use_namespace_std").checked;
+        use_ll_typedef = document.getElementById("use_ll_typedef").checked;
+        merge_option = document.getElementById("merge_option").checked;
+        n_merge_option = document.getElementById("n_merge_option").checked;
+        key_type = document.getElementById("key_type").value;
+        split_option = document.getElementById("split_option").checked;
+        three_split_option = document.getElementById("three_split_option").checked;
+        find_option = document.getElementById("find_option").checked;
+        findi_option = document.getElementById("findi_option").checked;
+        ins_option = document.getElementById("ins_option").checked;
+        del_option = document.getElementById("del_option").checked;
+        del_all_option = document.getElementById("del_all_option").checked;
+        size_option = document.getElementById("size_option").checked;
+        spliti_option = document.getElementById("spliti_option").checked;
+        three_spliti_option = document.getElementById("three_spliti_option").checked;
+        insi_option = document.getElementById("insi_option").checked;
+        deli_option = document.getElementById("deli_option").checked;
+        max_option = document.getElementById("max_option").checked;
+        min_option = document.getElementById("min_option").checked;
+        unite_option = document.getElementById("unite_option").checked;
+        unite_fast_option = document.getElementById("unite_fast_option").checked;
+        range_sum = document.getElementById("range_sum").checked;
+        range_max = document.getElementById("range_max").checked;
+        range_min = document.getElementById("range_min").checked;
+        lazy_prop = document.getElementById("lazy_prop").checked;
+        range_reverse_key = document.getElementById("range_reverse_key").checked;
+        range_reverse_index = document.getElementById("range_reverse_index").checked;
+        range_reverse = range_reverse_key || range_reverse_index;
+        range_add = document.getElementById("range_add").checked;
+        range_set = document.getElementById("range_set").checked;
+        range_update_key = document.getElementById("range_update_key").checked;
+        range_update_index = document.getElementById("range_update_index").checked;
+        range_query_key = document.getElementById("range_query_key").checked;
+        range_query_index = document.getElementById("range_query_index").checked;
+        val_type = document.getElementById("val_type").value;
+        range_type = document.getElementById("range_type").value;
+        range_agg = document.getElementById("range_agg").checked
+        signature = document.getElementById("signature").checked
+        comments = document.getElementById("comments").checked
+        template = document.getElementById("template").checked;
+        par_option = document.getElementById("par_option").checked;
+        clean_option = document.getElementById("clean_option").checked;
+        order_option = document.getElementById("order_option").checked;
+        build_option = document.getElementById("build_option").checked;
+        heapify_option = document.getElementById("heapify_option").checked;
+        tour_option = document.getElementById("tour_option").checked;
+        key_sum = document.getElementById("key_sum").checked;
+        key_add = document.getElementById("key_add").checked;
+        key_set = document.getElementById("key_set").checked;
+        namespace_treap = document.getElementById("namespace_treap").checked;
+        enable_value = document.getElementById("enable_value").checked;
+        root_option = document.getElementById("root_option").checked;
+        rot_option = document.getElementById("rot_option").checked;
+        mod_option = document.getElementById("mod_option").checked;
+        modi_option = document.getElementById("modi_option").checked;
+        partition_key = document.getElementById("partition_key").checked;
+        partition_index = document.getElementById("partition_index").checked;
+        cumulative_partition_key = document.getElementById("cumulative_partition_key").checked;
+        cumulative_partition_index = document.getElementById("cumulative_partition_index").checked;
+
+        mem_size = parseInt(document.getElementById("mem_size").value);
+
+        treap_beats = document.getElementById("treap_beats").checked;
+        beats_add = document.getElementById("beats_add").checked;
+        beats_chmin = document.getElementById("beats_chmin").checked;
+        beats_chmax = document.getElementById("beats_chmax").checked;
+
+        optimise = document.getElementById("optimise").checked;
+        build_inplace = document.getElementById("build_inplace").checked;
+
+        clearWarnings();
+        applyDependencies();
+        checkForWarnings();
+        displayWarnings();
+        updateCodeDisplay();
+    }
+
+    function addWarning(message) { warnings.push(message); }
+    function clearWarnings() { warnings = []; document.getElementById("warnings").innerHTML = ""; }
+    function checkForWarnings() {
+        if (range_update_key || range_query_key) {
+            addWarning("The implementation of range operations with keys has quite a high constant factor. Beware of TLE on tight time limits. Consider switching to indices if possible.")
+        }
+        if (range_sum && val_type !== 'long long') {
+            addWarning("Be careful for overflows when using range sum with integers.")
+        }
+        if (n_merge_option) {
+            addWarning("Merge with 5+ arguments will conflict with std::merge. Do Treap::merge(...) for 5 or more arguments.")
+        }
+        if (range_reverse && (range_update_key || range_update_index)) {
+            addWarning("You must use the dedicated range reverse function to perform range reversals. Otherwise, it will not work.")
+        }
+    }
+    function displayWarnings() {
+        const warningDiv = document.getElementById("warnings");
+        if (warnings.length > 0) warningDiv.innerHTML = warnings.join("<br>");
+    }
+
+    function copyCode() {
+        code = "";
+        if (signature) code += "// generated at caterpillow.github.io/byot\n\n";
+        code += document.getElementById("code_display").textContent;
+
+        navigator.clipboard.writeText(code).then(() => {
+            displayCopyStatus("Code copied successfully!", "success");
+        }).catch(err => {
+            displayCopyStatus("Failed to copy code!", "error");
+        });
+    }
+
+    function displayCopyStatus(message, status) {
+        const copyStatus = document.getElementById("copy_status");
+        copyStatus.textContent = message;
+        copyStatus.style.color = status === "success" ? "green" : "red";
+        copyStatus.style.fontWeight = "bold";
+
+        setTimeout(() => {
+            copyStatus.textContent = "";
+        }, 3000);
+    }
+
+    function getTabCharacter() {
+        const tabChar = document.getElementById('tab_char').value;
+        switch (tabChar) {
+            case '2spaces':
+                return '  '; // 2 spaces
+            case '3spaces':
+                return '   '; // 3 spaces
+            case '4spaces':
+                return '    '; // 4 spaces
+            case '8spaces':
+                return '        ' // 8 spaces
+            case 'tab':
+                return '\t'; // Tab character
+            default:
+                return '    '; // Default is 4 spaces
+        }
+    }
+
+    function updateCodeDisplay() {
+        let code = "";
+
+        let inf = (val_type === 'int' ? '1\'000\'000\'000' : '1\'000\'000\'000\'000\'000\'000')
+        let pull = range_agg || par_option || size_option;
+        // let pull = size_option || range_sum || range_max || range_min || key_sum || par_option;
+        let push = lazy_prop;
+        let incexc = range_type === 'inc exc';
+
+        // start code displaying
+
+        if (lazy_prop) {
+            if (range_set && comments) code += "// val is the increment amount, inc is a bool for whether this tag increments (inc = false means set)\n"
+            code += `struct Lazy {\n`;
+
+            if (range_reverse) code += '    bool rev;\n'
+            if (range_add || range_set) code += `    ${val_type} val;\n`;
+            if (range_set) code += "    bool inc;\n";
+
+            if (key_add || key_set) code += `    ${key_type} kval;\n`;
+            if (key_set) code += "    bool kinc;\n";
+
+            if (beats_chmin) code += `    ${val_type} mn;\n`
+            if (beats_chmax) code += `    ${val_type} mx;\n`
+            if (beats_add) code += `    ${val_type} add;\n`
+
+            code += "\n";
+            code += `    void operator+=(const Lazy& oth) {\n`;
+            if (range_reverse) code += '        rev ^= oth.rev;\n'
+            if (range_add || range_set) {
+                if (range_set) code += "        if (!oth.inc) val = 0, inc = false;\n";
+                code += "        val += oth.val;\n";
+            }
+            if (key_add || key_set) {
+                if (key_set) code += "        if (!oth.kinc) kval = 0, kinc = false;\n";
+                code += "        kval += oth.kval;\n";
+            }
+
+            if (beats_chmin && beats_chmax) {
+                code += `        if (oth.mn${beats_add ? " - add" : ""} <= mx) mn = mx = oth.mn${beats_add ? " - add" : ""};\n` +
+                    `        else if (oth.mx${beats_add ? " - add" : ""} >= mn) mn = mx = oth.mx${beats_add ? " - add" : ""};\n` +
+                    `        else {\n` +
+                    `            mn = min(mn, oth.mn${beats_add ? " - add" : ""});\n` +
+                    `            mx = max(mx, oth.mx${beats_add ? " - add" : ""});\n` +
+                    '        }\n'
+            } else {
+                if (beats_chmin) code += `        mn = min(mn, oth.mn${beats_add ? " - add" : ""});\n`
+                if (beats_chmax) code += `        mx = max(mx, oth.mx${beats_add ? " - add" : ""});\n`
+            }
+            if (beats_add) code += `        add += oth.add;\n`
+
+            code += "    }\n";
+            code += "};\n\n";
+
+            let lazy_id = [];
+            if (range_reverse) lazy_id.push("false");
+            if (range_add || range_set) lazy_id.push("0");
+            if (range_set) lazy_id.push("true");
+            if (key_add || key_set) lazy_id.push("0");
+            if (key_set) lazy_id.push("0")
+            if (beats_chmin) lazy_id.push(inf)
+            if (beats_chmax) lazy_id.push(`-${inf}`)
+            if (beats_add) lazy_id.push('0')
+            code += `const Lazy lid = {${lazy_id.join(", ")}};\n\n`;
+        }
+
+        if (beats_chmin) code += 'Lazy chmin_tag(ll x) { Lazy lazy = lid; lazy.mn = x; return lazy; }\n'
+        if (beats_chmax) code += 'Lazy chmax_tag(ll x) { Lazy lazy = lid; lazy.mx = x; return lazy; }\n'
+        if (beats_add) code += 'Lazy add_tag(ll x) { Lazy lazy = lid; lazy.add = x; return lazy; }\n'
+        code += '\n'
+
+        if (enable_value) {
+            if (comments) code += "// You can implement your own monoid here for custom operations.\n";
+            code += `struct Value {\n`;
+            if (range_sum) code += `    ${val_type} sum;\n`;
+            if (range_max) code += `    ${val_type} mx;\n`;
+            if (range_min) code += `    ${val_type} mn;\n`;
+            if (key_sum) code += `    ${key_type} ksum;\n`;
+            if (treap_beats) code += `    ${val_type} sum;\n`;
+            if (beats_chmin) code += `    ${val_type} mx, mxcnt, mx2;\n`
+            if (beats_chmax) code += `    ${val_type} mn, mncnt, mn2;\n`
+            code += "\n";
+
+            if (treap_beats) {
+                let args = []
+                if (key_sum) args.push("0")
+                if (treap_beats) args.push("x * len")
+                if (beats_chmin) {
+                    args.push("x")
+                    args.push("len")
+                    args.push(`-${inf}`)
+                }
+                if (beats_chmax) {
+                    args.push("x")
+                    args.push("len")
+                    args.push(inf)
+                }
+                code += '    static Value make(ll x, ll len = 1) {\n' +
+                    `        return {${args.join(", ")}};\n` +
+                    '    }\n\n'
+            }
+
+            if (treap_beats) {
+                let args1 = []
+                let args2 = []
+                if (beats_chmin) {
+                    args1.push("lazy.mn >= mx")
+                    args2.push("mx2 < lazy.mn")
+                }
+                if (beats_chmax) {
+                    args1.push("lazy.mx <= mn")
+                    args2.push("mn2 > lazy.mx")
+                }
+                if (beats_add) args1.push("lazy.add == 0")
+
+                code += '    bool can_break(const Lazy& lazy) {\n' +
+                    `        return ${args1.join(" && ")};\n` +
+                    '    }\n' +
+                    '\n' +
+                    '    bool can_tag(const Lazy& lazy) {\n' +
+                    `        return ${args2.join(" && ")};\n` +
+                    '    }\n\n'
+            }
+
+            if (lazy_prop) {
+                code += `    void upd(Lazy lazy${size_option ? ', int sz' : ''}) {\n`
+                if (range_set) {
+                    items = []
+                    if (range_sum) items.push("sum = ")
+                    if (range_max) items.push("mx = ")
+                    if (range_min) items.push("mn = ")
+                    if (items.length > 0) code += `        if (!lazy.inc) ${items.join('')}0;\n`
+                }
+                if (range_add || range_set) {
+                    if (range_sum) code += '        sum += lazy.val * sz;\n'
+                    if (range_max) code += '        mx += lazy.val;\n'
+                    if (range_min) code += '        mn += lazy.val;\n'
+                }
+                if (key_set) {
+                    items = []
+                    if (key_sum) items.push("ksum = ")
+                    if (items.length > 0) code += `        if (!lazy.kinc) ${items.join('')}0;\n`
+                }
+                if (key_add || key_set) {
+                    if (key_sum) code += '        ksum += lazy.val * sz;\n'
+                }
+                if (beats_chmin && beats_chmax) {
+                    code += '        if (mn == mx) {\n' +
+                        '            mn = mx = min(lazy.mn, mn);\n' +
+                        '            mn = mx = max(lazy.mx, mn);\n' +
+                        '            sum = mn * mncnt;\n' +
+                        '        } else if (mn == mx2) {\n' +
+                        '            if (lazy.mx > mn) mn = mx2 = lazy.mx;\n' +
+                        '            if (lazy.mn < mx) mx = mn2 = lazy.mn;\n' +
+                        '            sum = mn * mncnt + mx * mxcnt;\n' +
+                        '        } else {\n' +
+                        '            if (lazy.mn < mx) sum -= (mx - lazy.mn) * mxcnt, mx = lazy.mn;\n' +
+                        '            if (lazy.mx > mn) sum += (lazy.mx - mn) * mncnt, mn = lazy.mx;\n' +
+                        '        }\n'
+                } else {
+                    if (beats_chmin) code += '        if (lazy.mn < mx) sum -= (mx - lazy.mn) * mxcnt, mx = lazy.mn;\n'
+                    if (beats_chmax) code += '        if (lazy.mx > mn) sum += (lazy.mx - mn) * mncnt, mn = lazy.mx;\n'
+                }
+                if (beats_add) {
+                    code += '        sum += lazy.add * sz;\n'
+                    if (beats_chmin) code += '        mx += lazy.add, mx2 += lazy.add;\n'
+                    if (beats_chmax) code += '        mn += lazy.add, mn2 += lazy.add;\n'
+                }
+                code += '    }\n\n'
+            }
+
+            if (range_agg) {
+                code += `    Value operator+(const Value& oth) const {\n` +
+                    "        Value res {};\n";
+                if (range_sum) code += "        res.sum = sum + oth.sum;\n";
+                if (range_max) code += "        res.mx = std::max(mx, oth.mx);\n";
+                if (range_min) code += "        res.mn = std::min(mn, oth.mn);\n";
+                if (key_sum) code += "        res.ksum = ksum + oth.ksum;\n";
+                if (treap_beats) code += '        res.sum = sum + oth.sum;\n'
+                if (beats_chmin) code += '        if (mx == oth.mx) res.mx = mx, res.mxcnt = mxcnt + oth.mxcnt, res.mx2 = max(mx2, oth.mx2);\n' +
+                    '        else if (mx > oth.mx) res.mx = mx, res.mxcnt = mxcnt, res.mx2 = max(mx2, oth.mx);\n' +
+                    '        else res.mx = oth.mx, res.mxcnt = oth.mxcnt, res.mx2 = max(mx, oth.mx2);\n'
+                if (beats_chmax) code += '        if (mn == oth.mn) res.mn = mn, res.mncnt = mncnt + oth.mncnt, res.mn2 = min(mn2, oth.mn2);\n' +
+                    '        else if (mn < oth.mn) res.mn = mn, res.mncnt = mncnt, res.mn2 = min(mn2, oth.mn);\n' +
+                    '        else res.mn = oth.mn, res.mncnt = oth.mncnt, res.mn2 = min(mn, oth.mn2);\n'
+                code += "        return res;\n" +
+                    "    }\n"
+            }
+            code += "};\n\n";
+
+
+            let val_id = [];
+            if (range_sum) val_id.push("0")
+            if (range_max) val_id.push(`-${inf}`)
+            if (range_min) val_id.push(`${inf}`)
+            if (key_sum) val_id.push("0")
+            if (treap_beats) val_id.push("0")
+            if (beats_chmin) {
+                val_id.push(`-${inf}`)
+                val_id.push('0')
+                val_id.push(`-${inf}`)
+            }
+            if (beats_chmax) {
+                val_id.push(`${inf}`)
+                val_id.push('0')
+                val_id.push(`${inf}`)
+            }
+            code += `const Value vid = {${val_id.join(", ")}};\n\n`;
+        }
+
+        {
+            code += "std::mt19937 mt(std::chrono::steady_clock::now().time_since_epoch().count());\n" +
+                "using ptr = int;\n"
+            if (key_type === "T") code += 'using T = ;\n'
+            code += "\nstruct Node {\n"
+            if (enable_value) code += "    Value val;\n";
+            if (range_agg) code += "    Value agg;\n";
+            if (lazy_prop) code += "    Lazy lazy;\n";
+            code += "\n";
+            if (key_type !== "none") code += `    ${key_type} key;\n`;
+            if (size_option) code += "    int sz;\n";
+            code += "    int pri;\n" +
+                "    ptr l, r;\n"
+            if (par_option) code += "    ptr par;\n";
+
+            code += '\n';
+
+            // make constructor
+
+            let params = []
+            let bruh = []
+            if (key_type !== 'none') {
+                params.push(`${key_type} key`)
+                bruh.push('key(key)')
+            }
+            if (enable_value) {
+                params.push('Value val')
+                bruh.push('val(val)')
+            }
+            if (range_agg) bruh.push('agg(val)')
+
+            // default constructor
+            if (params.length > 0) {
+                code += '    Node() {\n'
+                code += '        pri = mt();\n'
+                if (enable_value) code += '        val = vid;\n'
+                if (range_agg) code += '        agg = vid;\n'
+                if (lazy_prop) code += '        lazy = lid;\n'
+                if (size_option) code += '        sz = 0;\n'
+                code += '        l = r = 0;\n'
+                if (par_option) code += '        par = 0;\n'
+                code += '    }\n\n'
+            }
+
+            let param_str = params.join(", ")
+            let bruh_str = ''
+            if (bruh.length > 0) bruh_str += ' : '
+            bruh_str += bruh.join(", ")
+            code += `    Node(${param_str})${bruh_str} {\n`
+            code += '        pri = mt();\n'
+            if (lazy_prop) code += '        lazy = lid;\n'
+            if (size_option) code += '        sz = 1;\n'
+            code += '        l = r = 0;\n'
+            if (par_option) code += '        par = 0;\n'
+            if (key_sum) code += '        val.ksum = agg.ksum = 0;\n'
+            code += '    }\n'
+            code += "};\n\n"
+        }
+
+        let params = []
+        let args = []
+        if (key_type !== 'none') {
+            params.push(`${key_type} key`)
+            args.push('key')
+        }
+        if (enable_value) {
+            params.push('Value val')
+            args.push('val')
+        }
+
+        if (mem_size > 0) {
+            code += 'int next_node = 1;\n' +
+                `Node mem[${mem_size + 1}];\n` +
+                '\n' +
+                `int make_node(${params.join(", ")}) {\n` +
+                `    mem[next_node] = Node(${args.join(", ")});\n` +
+                '    return next_node++;\n' +
+                '}\n\n'
+        } else {
+            code += 'vector<Node> mem(1);\n' +
+                '\n' +
+                `int make_node(${params.join(", ")}) {\n` +
+                `    mem.emplace_back(${args.join(", ")});\n` +
+                '    return mem.size() - 1;\n' +
+                '}\n\n'
+        }
+
+        if (push) {
+            code += "void push(ptr n) {\n";
+            if (lazy_prop) {
+                if (enable_value) code += `    mem[n].val.upd(mem[n].lazy${size_option ? ', 1' : ''});\n`;
+                if (range_agg) code += `    mem[n].agg.upd(mem[n].lazy${size_option ? ', mem[n].sz' : ''});\n`;
+                if (range_reverse) code += '    if (mem[n].lazy.rev) std::swap(mem[n].l, mem[n].r);\n';
+                code += "    mem[mem[n].l].lazy += mem[n].lazy;\n" +
+                    "    mem[mem[n].r].lazy += mem[n].lazy;\n" +
+                    "    mem[n].lazy = lid;\n";
+            }
+            code += "}\n\n";
+        }
+
+        if (pull) {
+            code += 'ptr pull(ptr n) {\n' +
+                '    if (n == 0) return 0;\n';
+            if (push) {
+                if (optimise) {
+                    code += '    push(mem[n].l);\n' +
+                        '    push(mem[n].r);\n'
+                    if (range_agg) code += '    mem[0].agg = vid;\n'
+                } else {
+                    code += '    if (mem[n].l != 0) push(mem[n].l);\n' +
+                        '    if (mem[n].r != 0) push(mem[n].r);\n';
+                }
+            }
+            if (par_option) code += '    mem[mem[n].l].par = n;\n' +
+                '    mem[mem[n].r].par = n;\n';
+            if (size_option) code += '    mem[n].sz = mem[mem[n].l].sz + 1 + mem[mem[n].r].sz;\n';
+            if (range_agg) code += '    mem[n].agg = mem[mem[n].l].agg + mem[n].val + mem[mem[n].r].agg;\n';
+
+            code += '    return n;\n' +
+                '}\n\n';
+        }
+
+
+        if (merge_option) {
+            code += 'ptr merge(ptr l, ptr r) {\n' +
+                '    if (!l || !r) return l ? l : r;\n';
+            if (push) code += '    push(l), push(r);\n';
+            code += `    if (mem[l].pri > mem[r].pri) return mem[l].r = merge(mem[l].r, r), ${pull ? 'pull(l)' : 'l'};\n` +
+                `    else return mem[r].l = merge(l, mem[r].l), ${pull ? 'pull(r)' : 'r'};\n` +
+                '}\n\n';
+        }
+
+
+        if (n_merge_option) {
+            code += 'template<typename... Args>\n' +
+                'ptr merge(ptr l, Args... args) {\n' +
+                '    return merge(l, merge(args...));\n' +
+                '}\n\n'
+        }
+
+        if (split_option) {
+            if (comments) code += '// [-inf, k) and [k, inf]\n';
+            code += `std::pair<ptr, ptr> split(ptr n, ${key_type} k) {\n`;
+            code += '    if (!n) return {};\n';
+            if (par_option) code += '    mem[n].par = 0;\n';
+            if (push) code += '    push(n);\n';
+            code += '    if (k <= mem[n].key) {\n' +
+                '        auto [l, r] = split(mem[n].l, k);\n' +
+                '        mem[n].l = r;\n' +
+                `        return {l, ${pull ? "pull(n)" : "n"}};\n` +
+                '    } else {\n' +
+                '        auto [l, r] = split(mem[n].r, k);\n' +
+                '        mem[n].r = l;\n' +
+                `        return {${pull ? "pull(n)" : "n"}, r};\n` +
+                '    }\n' +
+                '}\n\n';
+        }
+
+        if (three_split_option) {
+            if (comments) code += `// cuts out [lo, hi${incexc ? ')' : ']'}\n`
+            code += `std::tuple<ptr, ptr, ptr> split(ptr n, ${key_type} lo, ${key_type} hi) {\n` +
+                `    auto [lm, r] = split(n, hi${incexc ? '' : ' + 1'});\n` +
+                '    auto [l, m] = split(lm, lo);\n' +
+                '    return {l, m, r};\n' +
+                '}\n\n'
+        }
+
+        if (find_option) {
+            code += 'ptr find(ptr n, int k) {\n' +
+                '    if (!n) return 0;\n';
+            if (push) code += '    push(n);\n';
+            code += '    if (mem[n].key == k) return n;\n' +
+                '    if (k <= mem[n].key) return find(mem[n].l, k);\n' +
+                '    else return find(mem[n].r, k);\n' +
+                '}\n\n';
+        }
+
+        if (findi_option) {
+            code += 'ptr findi(ptr n, int i) {\n' +
+                '    if (!n) return 0;\n';
+            if (push) code += '    push(n);\n';
+            code += '    if (mem[n].sz == i) return n;\n' +
+                '    if (i < mem[n].sz) return findi(mem[n].l, i);\n' +
+                '    else return findi(mem[n].r, i - mem[mem[n].l].sz - 1);\n' +
+                '}\n\n';
+        }
+
+        if (ins_option) {
+            if (comments) code += '// only insert single nodes\n';
+            code += 'void ins(ptr& n, ptr it) {\n' +
+                '    if (!n) { n = it; return; }\n';
+            if (push) code += '    push(n);\n';
+            code += '    if (mem[n].pri < mem[it].pri) {\n' +
+                '        auto [l, r] = split(n, mem[it].key);\n' +
+                '        mem[it].l = l, mem[it].r = r, n = it;\n' +
+                '    } else if (mem[it].key <= mem[n].key) ins(mem[n].l, it);\n' +
+                '    else ins(mem[n].r, it);\n';
+            if (pull) code += '    pull(n);\n';
+            code += '}\n\n';
+        }
+
+        if (del_option) {
+            if (comments) code += '// returns pointer to deleted node\n';
+            code += `ptr del(ptr& n, ${key_type} k) {\n` +
+                '    if (!n) return 0;\n';
+            if (push) code += '    push(n);\n';
+            code += `    if (mem[n].key == k) { ptr ret = n; n = merge(mem[n].l, mem[n].r); ${par_option ? "mem[ret].par = 0; " : ""}return ret; }\n` +
+                '    ptr ret = k <= mem[n].key ? del(mem[n].l, k) : del(mem[n].r, k);\n';
+            if (pull) code += '    pull(n);\n';
+            code += '    return ret;\n' +
+                '}\n\n';
+        }
+
+
+        if (del_all_option) {
+            if (comments) code += '// removes all nodes with given key, and returns it in one big treap\n'
+            code += `ptr del_all(ptr& n, ${key_type} k) {\n` +
+                '    auto [lm, r] = split(n, k + 1);\n' +
+                '    auto [l, m] = split(lm, k);\n' +
+                '    n = merge(l, r);\n' +
+                '    return m;\n' +
+                '}\n\n'
+        }
+
+        if (mod_option) {
+            if (comments) code += '// performs an arbitrary operation on some node\n';
+            code += 'template <typename Op>\n' +
+                `void modify(ptr n, ${key_type} k, Op op) {\n` +
+                '    if (!n) return;\n';
+            if (push) code += '    push(n);\n';
+            code += '    if (mem[n].key == k) op(n);\n' +
+                '    else if (k <= mem[n].key) modify(mem[n].l, k, op);\n' +
+                '    else modify(mem[n].r, k, op);\n';
+            if (pull) code += '    pull(n);\n';
+            code += '}\n\n';
+        }
+
+        if (spliti_option) {
+            if (comments) code += '// [-inf, i) and [i, inf]\n';
+            code += 'std::pair<ptr, ptr> spliti(ptr n, int i) {\n' +
+                '    if (!n) return {0, 0};\n';
+            if (par_option) code += '    mem[n].par = 0;\n';
+            if (push) code += '    push(n);\n';
+            code += '    if (i <= mem[mem[n].l].sz) {\n' +
+                '        auto [l, r] = spliti(mem[n].l, i);\n' +
+                '        mem[n].l = r;\n' +
+                '        return {l, pull(n)};\n' +
+                '    } else {\n' +
+                '        auto [l, r] = spliti(mem[n].r, i - 1 - mem[mem[n].l].sz);\n' +
+                '        mem[n].r = l;\n' +
+                '        return {pull(n), r};\n' +
+                '    }\n' +
+                '}\n\n';
+        }
+
+        if (three_spliti_option) {
+            if (comments) code += `// cuts out [lo, hi${incexc ? ')' : ']'}\n`
+            code += 'std::tuple<ptr, ptr, ptr> spliti(ptr n, int lo, int hi) {\n' +
+                `    auto [lm, r] = spliti(n, hi${incexc ? '' : ' + 1'});\n` +
+                '    auto [l, m] = spliti(lm, lo);\n' +
+                '    return {l, m, r};\n' +
+                '}\n\n'
+        }
+
+        if (insi_option) {
+            if (comments) code += '// inserts node such that it will be at index i. only insert single nodes\n';
+            code += 'void insi(ptr& n, ptr it, int i) {\n' +
+                '    if (!n) { n = it; return; }\n';
+            if (push) code += '    push(n);\n';
+            code += '    if (mem[n].pri < mem[it].pri) {\n' +
+                '        auto [l, r] = spliti(n, i);\n' +
+                '        mem[it].l = l, mem[it].r = r, n = it;\n' +
+                '    } else if (i <= mem[mem[n].l].sz) insi(mem[n].l, it, i);\n' +
+                '    else insi(mem[n].r, it, i - 1 - mem[mem[n].l].sz);\n' +
+                '    pull(n);\n' +
+                '}\n\n';
+        }
+
+        if (deli_option) {
+            if (comments) code += '// returns pointer to deleted node\n';
+            code += 'ptr deli(ptr& n, int i) {\n' +
+                '    if (!n) return 0;\n';
+            if (push) code += '    push(n);\n';
+            code += `    if (i == mem[mem[n].l].sz) { ptr ret = n; n = merge(mem[n].l, mem[n].r); ${par_option ? "mem[ret].par = 0; " : ""}return ret; }\n` +
+                '    ptr ret = i <= mem[mem[n].l].sz ? deli(mem[n].l, i) : deli(mem[n].r, i - 1 - mem[mem[n].l].sz);\n';
+            if (pull) code += '    pull(n);\n';
+            code += '    return ret;\n' +
+                '}\n\n';
+        }
+
+        if (modi_option) {
+            if (comments) code += '// performs an arbitrary operation on some node\n';
+            code += 'template <typename Op>\n' +
+                'void modifyi(ptr n, int i, Op op) {\n' +
+                '    if (!n) return;\n';
+            if (push) code += '    push(n);\n';
+            code += '    if (mem[mem[n].l].sz == i) op(n);\n' +
+                '    else if (i <= mem[mem[n].l].sz) modifyi(mem[n].l, i, op);\n' +
+                '    else modifyi(mem[n].r, i - 1 - mem[mem[n].l].sz, op);\n';
+            if (pull) code += '    pull(n);\n';
+            code += '}\n\n';
+        }
+
+        if (rot_option) {
+            if (comments) code += '// rotates treap such that index i is at the start\n'
+            code +='void rotate(ptr& n, int i) {\n' +
+                '    auto [l, r] = spliti(n, i);\n' +
+                '    n = merge(r, l);\n' +
+                '}\n\n'
+        }
+
+        if (partition_key) {
+            if (comments) code += "// finds smallest key such that pred returns false\n";
+            code += "template<typename Pred>\n" +
+                `${key_type} partition_key(ptr n, Pred pred) {\n`;
+            if (push) code += "    push(n);\n";
+            code += "    if (pred(n)) return mem[n].r ? partition_key(mem[n].r, pred) : mem[n].key + 1;\n" +
+                "    else return mem[n].l ? partition_key(mem[n].l, pred) : mem[n].key;\n" +
+                "}\n\n";
+        }
+
+        if (partition_index) {
+            if (comments) code += '// find smallest index such that pred returns false\n';
+            code += 'template<typename Pred>\n' +
+                'int partition_index(ptr n, Pred pred) {\n' +
+                '    if (!n) return 0;\n';
+            if (push) code += '    push(n);\n';
+            code += '    if (pred(n)) return mem[mem[n].l].sz + 1 + partition_index(mem[n].r, pred);\n' +
+                '    else return partition_index(mem[n].l, pred);\n' +
+                '}\n\n';
+        }
+
+        if (cumulative_partition_key) {
+            if (comments) code += '// given a predicate that will return true for some prefix of aggregates,\n' +
+                '// find the key of the first prefix aggregate makes the predicate false (max key + 1 if always true)\n' +
+                '// eg. find the smallest prefix that has sum > x\n';
+            code += 'template <typename Pred>\n' +
+                `${key_type} cumulative_partition_key(ptr n, Pred pred, Value acc = vid) {\n`;
+            if (push) code += '    push(n);\n';
+            code += '    if (!pred(acc + mem[n].agg)) return mem[n].l ? cumulative_partition_key(mem[n].l, pred, acc) : mem[n].key;\n' +
+                '    if (!pred(acc = acc + mem[mem[n].l].agg + mem[n].val)) return mem[n].key;\n' +
+                '    return mem[n].r ? cumulative_partition_key(mem[n].r, pred, acc) : mem[n].key + 1;\n' +
+                '}\n\n';
+        }
+
+        if (cumulative_partition_index) {
+            if (comments) code += '// given a predicate that will return true for some prefix of aggregates,\n' +
+                '// find the index of the first prefix aggregate that makes the predicate false (sz(n) if always true)\n' +
+                '// eg. find the smallest prefix that has sum > x\n';
+            code += 'template <typename Pred>\n' +
+                'int cumulative_partition_index(ptr n, Pred pred, Value acc = vid) {\n' +
+                '    if (!n) return 0;\n';
+            if (push) code += '    push(n);\n';
+            code += '    if (!pred(acc + mem[n].agg)) return cumulative_partition_index(mem[n].l, pred, acc);\n' +
+                '    if (!pred(acc = acc + mem[mem[n].l].agg + mem[n].val)) return mem[n].sz;\n' +
+                '    return mem[mem[n].l].sz + 1 + cumulative_partition_index(mem[n].r, pred, acc);\n' +
+                '}\n\n';
+        }
+
+        if (min_option) {
+            code += 'ptr mn(ptr n) {\n';
+            if (push) code += '    push(n);\n';
+            code += '    return mem[n].l ? mn(mem[n].l) : n;\n' +
+                '}\n\n';
+        }
+
+        if (max_option) {
+            code += 'ptr mx(ptr n) {\n';
+            if (push) code += '    push(n);\n';
+            code += '    return mem[n].r ? mx(mem[n].r) : n;\n' +
+                '}\n\n';
+        }
+
+        if (unite_option) {
+            if (comments) code += '// proof of complexity: https://codeforces.com/blog/entry/108601\n';
+            code += 'ptr unite(ptr l, ptr r) {\n' +
+                '    if (!l || !r) return l ? l : r;\n' +
+                '    if (mem[l].key > mem[r].key) std::swap(l, r);\n' +
+                '    ptr res = 0;\n' +
+                '    while (r) {\n' +
+                '        auto [lt, rt] = split(l, mem[r].key + 1);\n' +
+                '        res = merge(res, lt);\n' +
+                '        tie(l, r) = make_pair(r, rt);\n' +
+                '    }\n' +
+                '    return merge(res, l);\n' +
+                '}\n\n';
+        }
+
+        if (unite_fast_option) {
+            if (comments) code += '// fast in practice (i think?)';
+            code += 'ptr unite_fast(ptr l, ptr r) {\n' +
+                '    if (!l || !r) return l ? l : r;\n';
+            if (push) code += '    push(l), push(r);\n';
+            code += '    if (mem[l].pri < mem[r].pri) std::swap(l, r);\n' +
+                '    auto [lhs, rhs] = split(r, mem[l].key);\n' +
+                '    mem[l].l = unite(mem[l].l, lhs);\n' +
+                '    mem[l].r = unite(mem[l].r, rhs);\n' +
+                `    return ${pull ? 'pull(l)' : 'l'};\n` +
+                '}\n\n';
+        }
+
+        if (range_reverse_key) {
+            if (comments) code += "// you CANNOT use the normal range update for range reverses\n";
+            code += `void reverse(ptr& n, ${key_type} lo, ${key_type} hi) {\n`;
+            code += `    auto [lm, r] = split(n, hi${incexc ? "" : " + 1"});\n` +
+                `    auto [l, m] = split(lm, lo${incexc ? "" : " + 1"});\n` +
+                '    Lazy upd = lid;\n' +
+                '    upd.rev = true;\n' +
+                '    if (m) mem[m].lazy += upd;\n' +  // Accessing lazy field of m in the mem array
+                '    n = merge(merge(l, m), r);\n' +
+                '}\n\n';
+        }
+
+        if (range_reverse_index) {
+            if (comments) code += "// you CANNOT use the normal range update for range reverses\n";
+            code += 'void reversei(ptr& n, int lo, int hi) {\n';
+            code += `    auto [lm, r] = spliti(n, hi${incexc ? "" : " + 1"});\n` +
+                `    auto [l, m] = spliti(lm, lo${incexc ? "" : " + 1"});\n` +
+                '    Lazy upd = lid;\n' +
+                '    upd.rev = true;\n' +
+                '    if (m) mem[m].lazy += upd;\n' +  // Accessing lazy field of m in mem array
+                '    n = merge(merge(l, m), r);\n' +
+                '}\n\n';
+        }
+
+        if (range_update_key && !treap_beats) {
+            code += `void upd(ptr& n, ${key_type} lo, ${key_type} hi, Lazy lazy) {\n` +
+                `    auto [lm, r] = split(n, ${incexc ? 'hi' : 'hi + 1'});\n` +
+                '    auto [l, m] = split(lm, lo);\n' +
+                '    if (m) mem[m].lazy += lazy;\n' +  // Accessing lazy field of m in mem array
+                '    n = merge(l, merge(m, r));\n' +
+                '}\n\n';
+        }
+
+        if (range_update_index) {
+            code += 'void updi(ptr n, int lo, int hi, Lazy lazy) {\n' +
+                '    if (!n) return;\n';
+            if (push) code += '    push(n);\n';
+            code += `    if (lo >= mem[n].sz || hi <${incexc ? '=' : ''} 0${treap_beats ? " || mem[n].agg.can_break(lazy)" : ""}) return;\n` +
+                `    if (lo <= 0 && mem[n].sz${incexc ? '' : ' - 1'} <= hi${treap_beats ? " && mem[n].agg.can_tag(lazy)" : ""}) {\n` +
+                '        mem[n].lazy += lazy;\n';  // Accessing lazy field of n in mem array
+            if (push) code += '        push(n);\n';
+            code += '        return;\n' +
+                '    }\n' +
+                `    if (lo <= mem[mem[n].l].sz && mem[mem[n].l].sz <${incexc ? '' : '='} hi) mem[n].val.upd(lazy${size_option ? ', 1' : ''});\n` +  // Corrected access to sz(mem[n].l)
+                '    updi(mem[n].l, lo, hi, lazy);\n' +  // Recursive calls now use indices
+                '    updi(mem[n].r, lo - 1 - mem[mem[n].l].sz, hi - 1 - mem[mem[n].l].sz, lazy);\n' +  // Corrected access to sz(mem[n].l)
+                '    pull(n);\n' +
+                '}\n\n';
+        }
+
+        if (range_update_key && treap_beats) {
+            code += `void upd(ptr& n, ${key_type} lo, ${key_type} hi, Lazy lazy) {\n` +
+                `    auto [lm, r] = split(n, ${incexc ? 'hi' : 'hi + 1'});\n` +
+                '    auto [l, m] = split(lm, lo);\n' +
+                '    updi(mem[m], 0, mem[mem[m]].sz, lazy);\n' +  // Using mem[m] to access the node at index m
+                '    n = merge(l, merge(m, r));\n' +
+                '}\n\n';
+        }
+
+        if (range_query_key) {
+            code += `Value query(ptr& n, ${key_type} lo, ${key_type} hi) {\n` +
+                `    auto [lm, r] = split(n, ${incexc ? 'hi' : 'hi + 1'});\n` +
+                '    auto [l, m] = split(lm, lo);\n' +
+                '    Value res = mem[m].agg;\n' +  // Accessing agg through mem[m]
+                '    n = merge(l, merge(m, r));\n' +
+                '    return res;\n' +
+                '}\n\n';
+        }
+
+        if (range_query_index) {
+            code += 'Value queryi(ptr n, int lo, int hi) {\n' +
+                `    if (!n || lo >= mem[n].sz || hi <${incexc ? '=' : ''} 0) return vid;\n`;
+            if (push) code += '    push(n);\n';
+            code += `    if (lo <= 0 && mem[n].sz${incexc ? '' : ' - 1'} <= hi) return mem[n].agg;\n` +
+                `    return queryi(mem[n].l, lo, hi) + (lo <= mem[mem[n].l].sz && mem[mem[n].l].sz <${incexc ? '' : '='} hi ? mem[n].val : vid) + queryi(mem[n].r, lo - 1 - mem[mem[n].l].sz, hi - 1 - mem[mem[n].l].sz);\n` +
+                '}\n\n';
+        }
+
+        if (clean_option) {
+            code += 'void clean(ptr n) {\n' +
+                '    if (!n) return;\n' +
+                '    clean(mem[n].par);\n' +  // Accessing parent using mem[n].par
+                '    push(n);\n' +
+                '}\n\n';
+        }
+
+        if (order_option) {
+            code += 'int order(ptr n, ptr from = 0) {\n' +
+                '    if (!n) return -1; // hack\n' +
+                '    int res = order(mem[n].par, n);\n' +  // Accessing parent with mem[n].par
+                '    if (from == mem[n].r || !from) res += mem[mem[n].l].sz + 1;\n' +  // Accessing left child size with mem[mem[n].l].sz
+                '    return res;\n' +
+                '}\n\n';
+        }
+
+        if (root_option) {
+            code += "ptr root(ptr n) {\n" +
+                "    while (mem[n].par) n = mem[n].par;\n" +  // Accessing parent with mem[n].par
+                "    return n;\n" +
+                "}\n\n";
+        }
+
+        if (heapify_option) {
+            code += 'void heapify(ptr n) {\n' +
+                '    if (!n) return;\n' +
+                '    ptr mx = n;\n' +
+                '    if (mem[n].l && mem[mem[n].l].pri > mem[n].pri) mx = mem[n].l;\n' +  // Accessing left child with mem[n].l
+                '    if (mem[n].r && mem[mem[n].r].pri > mem[n].pri) mx = mem[n].r;\n' +  // Accessing right child with mem[n].r
+                '    if (mx != n) std::swap(mem[n].pri, mem[mx].pri), heapify(mx);\n' +  // Accessing pri with mem[n].pri
+                '}\n\n';
+        }
+
+        if (build_option) {
+            code += 'ptr build(std::vector<ptr>& ns, int l = 0, int r = -69) {\n' +
+                '    if (r == -69) r = (int) ns.size() - 1;\n' +
+                '    if (l > r) return 0;\n' +  // 0 represents null index
+                '    if (l == r) return ns[l];\n' +
+                '    int m = (l + r) / 2;\n' +
+                '    mem[ns[m]].l = build(ns, l, m - 1);\n' +  // Accessing left child with mem[ns[m]].l
+                '    mem[ns[m]].r = build(ns, m + 1, r);\n' +  // Accessing right child with mem[ns[m]].r
+                '    heapify(ns[m]);\n' +
+                `    return ${pull ? 'pull(ns[m])' : 'ns[m]'};\n` +
+                '}\n\n';
+        }
+
+        if (build_inplace) {
+            code += 'ptr build(int l, int r) {\n' +
+                '    if (l > r) return 0;\n' +
+                '    if (l == r) return l;\n' +
+                '    int m = (l + r) / 2;\n' +
+                '    mem[m].l = build(l, m - 1);\n' +
+                '    mem[m].r = build(m + 1, r);\n' +
+                '    heapify(m);\n' +
+                `    return ${pull ? "pull(m)" : "m"};\n` +
+                '}\n\n'
+        }
+
+        if (tour_option) {
+            code += 'template <typename Op>\n' +
+                'void tour(ptr n, Op op) {\n' +
+                '    std::stack<ptr> stk;\n' +
+                '    while (n || !stk.empty()) {\n';
+            code += `        for (; n; n = mem[n].l) ${push ? "push(n), " : ""}stk.push(n);\n`
+            code += '        n = stk.top(); stk.pop();\n' +
+                '        op(n);\n' +
+                '        n = mem[n].r;\n' +  // Accessing right child with mem[n].r
+                '    }\n' +
+                '}\n\n';
+        }
+
+
+        // POST PROCESSING
+
+        if (use_namespace_std) code = code.replaceAll("std::", "");
+        if (use_ll_typedef) code = code.replaceAll("long long", "ll");
+        code = code.trim()
+        if (namespace_treap) {
+            code = "namespace Treap {\n\n    " + code.replaceAll("\n", "\n    ") + "\n\n}\n\nusing namespace Treap;\n\n"
+        }
+        if (template) {
+            prefix = ""
+            prefix += "#include <bits/stdc++.h>\n\n"
+            if (use_namespace_std) prefix += "using namespace std;\n"
+            if (use_ll_typedef) prefix += "using ll = long long;\n\n"
+            code = prefix + code
+            if (template) {
+                code += '\n\nmain() {\n' +
+                    '    cin.tie(0)->sync_with_stdio(0);\n' +
+                    '    \n' +
+                    '}\n'
+            }
+        }
+
+        const tab_character = getTabCharacter();
+        code = code.replace(/ {4}/g, tab_character);
+        document.getElementById("code_display").textContent = code;
+    }
+
+    window.onload = handleUpdate;
+</script>
+</body>
+</html>
