@@ -208,7 +208,10 @@
         <hr>
 
         <div>
-            <label><input type="checkbox" id="treap_beats"> Enable treap beats template</label><br>
+            <label><input type="checkbox" id="treap_beats"> Enable treap beats template (range sums)</label><br>
+            <label><input type="checkbox" id="beats_chmin"> Include range chmin</label><br>
+            <label><input type="checkbox" id="beats_chmax"> Include range chmax</label><br>
+            <label><input type="checkbox" id="beats_add"> Include range add</label><br>
         </div>
     </div>
 </div>
@@ -282,7 +285,6 @@ Warnings:
     let key_set = false;
 
     let namespace_treap = false;
-    let treap_beats = false;
     let root_option = false;
     let rot_option = false;
     let mod_option = false;
@@ -292,6 +294,11 @@ Warnings:
     let partition_index = false;
     let cumulative_partition_key = false;
     let cumulative_partition_index = false;
+
+    let treap_beats = false;
+    let beats_chmin = false;
+    let beats_chmax = false;
+    let beats_add = false;
 
 
     // Static dependencies graph
@@ -359,6 +366,9 @@ Warnings:
         ["treap_beats", "range_agg"],
         ["treap_beats", "lazy_prop"],
         ["treap_beats", "range_update_index"],
+        ["beats_chmin", "treap_beats"],
+        ["beats_chmax", "treap_beats"],
+        ["beats_add", "treap_beats"],
         ["val_type", "enable_value"],
         ["range_agg", "enable_value"],
         ["root_option", "par_option"],
@@ -371,7 +381,14 @@ Warnings:
         ["cumulative_partition_key", "key_type"],
         ["cumulative_partition_key", "range_agg"],
         ["cumulative_partition_index", "size_option"],
-        ["cumulative_partition_index", "range_agg"]
+        ["cumulative_partition_index", "range_agg"],
+        ["treap_beats", "val_type"]
+    ];
+
+    const mutual_exclusions = [
+        ["treap_beats", "range_sum"],
+        ["treap_beats", "range_min"],
+        ["treap_beats", "range_max"],
     ];
 
     const sortedDependencies = topsort(edges);
@@ -381,9 +398,27 @@ Warnings:
         handleUpdate();
     });
 
+    function disableBanned(id) {
+        mutual_exclusions.forEach(([id1, id2]) => {
+           if (id === id1) {
+               const el = document.getElementById(id2);
+               if (el.type === "checkbox") el.checked = false;
+               else if (el.tagName === "SELECT") el.value = el.options[0].value;
+           }
+           if (id === id2) {
+               const el = document.getElementById(id1);
+               if (el.type === "checkbox") el.checked = false;
+               else if (el.tagName === "SELECT") el.value = el.options[0].value;
+           }
+        });
+    }
+
     function initializeForm() {
         document.querySelectorAll("input[type='checkbox'], select").forEach(el => {
-            el.addEventListener("change", handleUpdate);
+            el.addEventListener("change", (event) => {
+                disableBanned(event.target.id)
+                handleUpdate()
+            });
             el.addEventListener("contextmenu", (e) => {
                 e.preventDefault();
                 enableDependencies(el.id);
@@ -434,18 +469,24 @@ Warnings:
 
             if (dep.tagName === "INPUT" && dep.type === "checkbox" && !dep.checked) {
                 dep.checked = true;
+                disableBanned(depId);
             }
 
             if (dep.tagName === "SELECT" && dep.value === dep.options[0].value) {
                 dep.value = dep.options[1].value;
+                disableBanned(depId);
             }
 
             dep.disabled = false;
         });
 
         if (element.tagName === "SELECT") {
-            if (element.value === element.options[0].value) element.value = element.options[1].value;
+            if (element.value === element.options[0].value) {
+                element.value = element.options[1].value;
+                disableBanned(element.id);
+            }
         } else if (element.type === "checkbox") {
+            disableBanned(id)
             element.checked = true;
         }
 
@@ -541,7 +582,6 @@ Warnings:
         key_add = document.getElementById("key_add").checked;
         key_set = document.getElementById("key_set").checked;
         namespace_treap = document.getElementById("namespace_treap").checked;
-        treap_beats = document.getElementById("treap_beats").checked;
         enable_value = document.getElementById("enable_value").checked;
         root_option = document.getElementById("root_option").checked;
         rot_option = document.getElementById("rot_option").checked;
@@ -552,6 +592,10 @@ Warnings:
         cumulative_partition_key = document.getElementById("cumulative_partition_key").checked;
         cumulative_partition_index = document.getElementById("cumulative_partition_index").checked;
 
+        treap_beats = document.getElementById("treap_beats").checked;
+        beats_add = document.getElementById("beats_add").checked;
+        beats_chmin = document.getElementById("beats_chmin").checked;
+        beats_chmax = document.getElementById("beats_chmax").checked;
 
         clearWarnings();
         applyDependencies();
@@ -644,6 +688,10 @@ Warnings:
             if (key_add || key_set) code += `    ${key_type} kval;\n`;
             if (key_set) code += "    bool kinc;\n";
 
+            if (beats_chmin) code += `    ${val_type} mn;\n`
+            if (beats_chmax) code += `    ${val_type} mx;\n`
+            if (beats_add) code += `    ${val_type} add;\n`
+
             code += "\n";
             code += `    void operator+=(const Lazy& oth) {\n`;
             if (range_reverse) code += '        rev ^= oth.rev;\n'
@@ -655,6 +703,20 @@ Warnings:
                 if (key_set) code += "        if (!oth.kinc) kval = 0, kinc = false;\n";
                 code += "        kval += oth.kval;\n";
             }
+
+            if (beats_chmin && beats_chmax) {
+                code += `        if (oth.mn${beats_add ? " - add" : ""} <= mx) mn = mx = oth.mn${beats_add ? " - add" : ""};\n` +
+                    `        else if (oth.mx${beats_add ? " - add" : ""} >= mn) mn = mx = oth.mx${beats_add ? " - add" : ""};\n` +
+                    `        else {\n` +
+                    `            mn = min(mn, oth.mn${beats_add ? " - add" : ""});\n` +
+                    `            mx = max(mx, oth.mx${beats_add ? " - add" : ""});\n` +
+                    '        }\n'
+            } else {
+                if (beats_chmin) code += `        mn = min(mn, oth.mn${beats_add ? " - add" : ""});\n`
+                if (beats_chmax) code += `        mx = max(mx, oth.mx${beats_add ? " - add" : ""});\n`
+            }
+            if (beats_add) code += `        add += oth.add;\n`
+
             code += "    }\n";
             code += "};\n\n";
 
@@ -664,8 +726,16 @@ Warnings:
             if (range_set) lazy_id.push("true");
             if (key_add || key_set) lazy_id.push("0");
             if (key_set) lazy_id.push("0")
+            if (beats_chmin) lazy_id.push(inf)
+            if (beats_chmax) lazy_id.push(`-${inf}`)
+            if (beats_add) lazy_id.push('0')
             code += `const Lazy lid = {${lazy_id.join(", ")}};\n\n`;
         }
+
+        if (beats_chmin) code += 'Lazy chmin_tag(ll x) { Lazy lazy = lid; lazy.mn = x; return lazy; }\n'
+        if (beats_chmax) code += 'Lazy chmax_tag(ll x) { Lazy lazy = lid; lazy.mx = x; return lazy; }\n'
+        if (beats_add) code += 'Lazy add_tag(ll x) { Lazy lazy = lid; lazy.add = x; return lazy; }\n'
+        code += '\n'
 
         if (enable_value) {
             if (comments) code += "// You can implement your own monoid here for custom operations.\n";
@@ -674,15 +744,49 @@ Warnings:
             if (range_max) code += `    ${val_type} mx;\n`;
             if (range_min) code += `    ${val_type} mn;\n`;
             if (key_sum) code += `    ${key_type} ksum;\n`;
+            if (treap_beats) code += `    ${val_type} sum;\n`;
+            if (beats_chmin) code += `    ${val_type} mx, mxcnt, mx2;\n`
+            if (beats_chmax) code += `    ${val_type} mn, mncnt, mn2;\n`
             code += "\n";
 
             if (treap_beats) {
+                let args = []
+                if (key_sum) args.push("0")
+                if (treap_beats) args.push("x * len")
+                if (beats_chmin) {
+                    args.push("x")
+                    args.push("len")
+                    args.push(`-${inf}`)
+                }
+                if (beats_chmax) {
+                    args.push("x")
+                    args.push("len")
+                    args.push(inf)
+                }
+                code += '    static Value make(ll x, ll len = 1) {\n' +
+                    `        return {${args.join(", ")}};\n` +
+                    '    }\n\n'
+            }
+
+            if (treap_beats) {
+                let args1 = []
+                let args2 = []
+                if (beats_chmin) {
+                    args1.push("lazy.mn >= mx")
+                    args2.push("mx2 < lazy.mn")
+                }
+                if (beats_chmax) {
+                    args1.push("lazy.mx <= mn")
+                    args2.push("mn2 > lazy.mx")
+                }
+                if (beats_add) args1.push("lazy.add == 0")
+
                 code += '    bool can_break(const Lazy& lazy) {\n' +
-                    '        return false;\n' +
+                    `        return ${args1.join(" && ")};\n` +
                     '    }\n' +
                     '\n' +
                     '    bool can_tag(const Lazy& lazy) {\n' +
-                    '        return true;\n' +
+                    `        return ${args2.join(" && ")};\n` +
                     '    }\n\n'
             }
 
@@ -708,6 +812,28 @@ Warnings:
                 if (key_add || key_set) {
                     if (key_sum) code += '        ksum += lazy.val * sz;\n'
                 }
+                if (beats_chmin && beats_chmax) {
+                    code += '        if (mn == mx) {\n' +
+                        '            mn = mx = min(lazy.mn, mn);\n' +
+                        '            mn = mx = max(lazy.mx, mn);\n' +
+                        '            sum = mn * mncnt;\n' +
+                        '        } else if (mn == mx2) {\n' +
+                        '            if (lazy.mx > mn) mn = mx2 = lazy.mx;\n' +
+                        '            if (lazy.mn < mx) mx = mn2 = lazy.mn;\n' +
+                        '            sum = mn * mncnt + mx * mxcnt;\n' +
+                        '        } else {\n' +
+                        '            if (lazy.mn < mx) sum -= (mx - lazy.mn) * mxcnt, mx = lazy.mn;\n' +
+                        '            if (lazy.mx > mn) sum += (lazy.mx - mn) * mncnt, mn = lazy.mx;\n' +
+                        '        }\n'
+                } else {
+                    if (beats_chmin) code += '        if (lazy.mn < mx) sum -= (mx - lazy.mn) * mxcnt, mx = lazy.mn;\n'
+                    if (beats_chmax) code += '        if (lazy.mx > mn) sum += (lazy.mx - mn) * mncnt, mn = lazy.mx;\n'
+                }
+                if (beats_add) {
+                    code += '        sum += lazy.add * sz;\n'
+                    if (beats_chmin) code += '        mx += lazy.add, mx2 += lazy.add;\n'
+                    if (beats_chmax) code += '        mn += lazy.add, mn2 += lazy.add;\n'
+                }
                 code += '    }\n\n'
             }
 
@@ -718,6 +844,13 @@ Warnings:
                 if (range_max) code += "        res.mx = std::max(mx, oth.mx);\n";
                 if (range_min) code += "        res.mn = std::min(mn, oth.mn);\n";
                 if (key_sum) code += "        res.ksum = ksum + oth.ksum;\n";
+                if (treap_beats) code += '        res.sum = sum + oth.sum;\n'
+                if (beats_chmin) code += '        if (mx == oth.mx) res.mx = mx, res.mxcnt = mxcnt + oth.mxcnt, res.mx2 = max(mx2, oth.mx2);\n' +
+                    '        else if (mx > oth.mx) res.mx = mx, res.mxcnt = mxcnt, res.mx2 = max(mx2, oth.mx);\n' +
+                    '        else res.mx = oth.mx, res.mxcnt = oth.mxcnt, res.mx2 = max(mx, oth.mx2);\n'
+                if (beats_chmax) code += '        if (mn == oth.mn) res.mn = mn, res.mncnt = mncnt + oth.mncnt, res.mn2 = min(mn2, oth.mn2);\n' +
+                    '        else if (mn < oth.mn) res.mn = mn, res.mncnt = mncnt, res.mn2 = min(mn2, oth.mn);\n' +
+                    '        else res.mn = oth.mn, res.mncnt = oth.mncnt, res.mn2 = min(mn, oth.mn2);\n'
                 code += "        return res;\n" +
                     "    }\n"
             }
@@ -729,6 +862,17 @@ Warnings:
             if (range_max) val_id.push(`-${inf}`)
             if (range_min) val_id.push(`${inf}`)
             if (key_sum) val_id.push("0")
+            if (treap_beats) val_id.push("0")
+            if (beats_chmin) {
+                val_id.push(`-${inf}`)
+                val_id.push('0')
+                val_id.push(`-${inf}`)
+            }
+            if (beats_chmax) {
+                val_id.push(`${inf}`)
+                val_id.push('0')
+                val_id.push(`${inf}`)
+            }
             code += `const Value vid = {${val_id.join(", ")}};\n\n`;
         }
 
@@ -1227,7 +1371,7 @@ Warnings:
 
         if (build_option) {
             code += 'ptr build(std::vector<ptr>& ns, int l = 0, int r = -69) {\n' +
-                '    if (r == -69) r = (int) size(ns) - 1;\n' +
+                '    if (r == -69) r = (int) ns.size() - 1;\n' +
                 '    if (l > r) return nullptr;\n' +
                 '    if (l == r) return ns[l];\n' +
                 '    int m = (l + r) / 2;\n' +
