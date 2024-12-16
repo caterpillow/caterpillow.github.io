@@ -714,7 +714,7 @@ Warnings:
             if (beats_add) code += `    ${val_type} add;\n`
 
             code += "\n";
-            code += `    void operator+=(const Lazy& oth) {\n`;
+            code += `    void operator+=(const Lazy oth) {\n`;
             if (range_reverse) code += '        rev ^= oth.rev;\n'
             if (range_add || range_set) {
                 if (range_set) code += "        if (!oth.inc) val = 0, inc = false;\n";
@@ -1038,7 +1038,7 @@ Warnings:
         }
 
         if (split_option) {
-            if (comments) code += '// [-inf, k) and [k, inf]\n';
+            if (comments) code += '// (-inf, k) and [k, inf)\n';
             code += `std::pair<ptr, ptr> split(ptr n, ${key_type} k) {\n`;
             code += '    if (!n) return {};\n';
             if (par_option) code += '    mem[n].par = 0;\n';
@@ -1103,7 +1103,7 @@ Warnings:
             code += `ptr del(ptr& n, ${key_type} k) {\n` +
                 '    if (!n) return 0;\n';
             if (push) code += '    push(n);\n';
-            code += `    if (mem[n].key == k) { ptr ret = n; n = merge(mem[n].l, mem[n].r); ${par_option ? "mem[ret].par = 0; " : ""}return ret; }\n` +
+            code += `    if (mem[n].key == k) { ptr ret = n; n = merge(mem[n].l, mem[n].r); mem[ret].l = mem[ret].r = ${par_option ? "mem[ret].par = " : ""}0; return ${pull ? "pull(ret)" : "ret" };\n` +
                 '    ptr ret = k <= mem[n].key ? del(mem[n].l, k) : del(mem[n].r, k);\n';
             if (pull) code += '    pull(n);\n';
             code += '    return ret;\n' +
@@ -1135,7 +1135,7 @@ Warnings:
         }
 
         if (spliti_option) {
-            if (comments) code += '// [-inf, i) and [i, inf]\n';
+            if (comments) code += '// (-inf, i) and [i, inf)\n';
             code += 'std::pair<ptr, ptr> spliti(ptr n, int i) {\n' +
                 '    if (!n) return {0, 0};\n';
             if (par_option) code += '    mem[n].par = 0;\n';
@@ -1180,7 +1180,7 @@ Warnings:
             code += 'ptr deli(ptr& n, int i) {\n' +
                 '    if (!n) return 0;\n';
             if (push) code += '    push(n);\n';
-            code += `    if (i == mem[mem[n].l].sz) { ptr ret = n; n = merge(mem[n].l, mem[n].r); ${par_option ? "mem[ret].par = 0; " : ""}return ret; }\n` +
+            code += `    if (i == mem[mem[n].l].sz) { ptr ret = n; n = merge(mem[n].l, mem[n].r); mem[ret].l = mem[ret].r = ${par_option ? "mem[ret].par = " : ""}0; return ${pull ? "pull(ret)" : "ret" };\n` +
                 '    ptr ret = i <= mem[mem[n].l].sz ? deli(mem[n].l, i) : deli(mem[n].r, i - 1 - mem[mem[n].l].sz);\n';
             if (pull) code += '    pull(n);\n';
             code += '    return ret;\n' +
