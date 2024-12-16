@@ -693,7 +693,7 @@ Warnings:
             if (beats_add) code += `    ${val_type} add;\n`
 
             code += "\n";
-            code += `    void operator+=(const Lazy& oth) {\n`;
+            code += `    void operator+=(const Lazy oth) {\n`;
             if (range_reverse) code += '        rev ^= oth.rev;\n'
             if (range_add || range_set) {
                 if (range_set) code += "        if (!oth.inc) val = 0, inc = false;\n";
@@ -998,7 +998,7 @@ Warnings:
         }
 
         if (split_option) {
-            if (comments) code += '// [-inf, k) and [k, inf]\n'
+            if (comments) code += '// (-inf, k) and [k, inf)\n'
             code += `std::pair<ptr, ptr> split(ptr n, ${key_type} k) {\n`;
             code += '    if (!n) return {nullptr, nullptr};\n'
             if (par_option) code += '    n->par = nullptr;\n'
@@ -1048,7 +1048,7 @@ Warnings:
             if (comments) code += '// only insert single nodes\n'
             code += 'void ins(ptr& n, ptr it) {\n' +
                 '    if (!n) { n = it; return; }\n'
-            if (push) '    push(n);\n'
+            if (push) code += '    push(n);\n'
             code += '    if (n->pri < it->pri) {\n' +
                 '        auto [l, r] = split(n, it->key);\n' +
                 '        it->l = l, it->r = r, n = it;\n' +
@@ -1063,7 +1063,7 @@ Warnings:
             code += `ptr del(ptr& n, ${key_type} k) {\n` +
                 '    if (!n) return nullptr;\n'
             if (push) code += '    push(n);\n'
-            code += `    if (n->key == k) { ptr ret = n; n = merge(n->l, n->r); ${par_option ? "ret->par = nullptr; " : ""}return ret; }\n` +
+            code += `    if (n->key == k) { ptr ret = n; n = merge(n->l, n->r); ret->l = ret->r = ${par_option ? "ret->par = " : ""}nullptr; return ${pull ? "pull(ret)" : "ret"}; }\n` +
                 '    ptr ret = k <= n->key ? del(n->l, k) : del(n->r, k);\n'
             if (pull) code += '    pull(n);\n'
             code += '    return ret;\n' +
@@ -1094,7 +1094,7 @@ Warnings:
         }
 
         if (spliti_option) {
-            if (comments) code += '// [-inf, i) and [i, inf]\n'
+            if (comments) code += '// (-inf, i) and [i, inf)\n'
             code += 'std::pair<ptr, ptr> spliti(ptr n, int i) {\n' +
                 '    if (!n) return {nullptr, nullptr};\n'
             if (par_option) code += '    n->par = nullptr;\n'
@@ -1139,7 +1139,7 @@ Warnings:
             code += 'ptr deli(ptr& n, int i) {\n' +
                 '    if (!n) return nullptr;\n'
             if (push) code += '    push(n);\n'
-            code += `    if (i == sz(n->l)) { ptr ret = n; n = merge(n->l, n->r);  ${par_option ? "ret->par = nullptr; " : ""}return ret; }\n` +
+            code += `    if (i == sz(n->l)) { ptr ret = n; n = merge(n->l, n->r); ret->l = ret->r = ${par_option ? "ret->par = " : ""}nullptr; return ${pull ? "pull(ret)" : "ret"};\n` +
                 '    ptr ret = i <= sz(n->l) ? deli(n->l, i) : deli(n->r, i - 1 - sz(n->l));\n'
             if (pull) code += '    pull(n);\n'
             code += '    return ret;\n' +
