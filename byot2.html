@@ -1180,7 +1180,7 @@ Warnings:
             code += 'ptr deli(ptr& n, int i) {\n' +
                 '    if (!n) return 0;\n';
             if (push) code += '    push(n);\n';
-            code += `    if (i == mem[mem[n].l].sz) { ptr ret = n; n = merge(mem[n].l, mem[n].r); mem[ret].l = mem[ret].r = ${par_option ? "mem[ret].par = " : ""}0; return ${pull ? "pull(ret)" : "ret" };\n` +
+            code += `    if (i == mem[mem[n].l].sz) { ptr ret = n; n = merge(mem[n].l, mem[n].r); mem[ret].l = mem[ret].r = ${par_option ? "mem[ret].par = " : ""}0; return ${pull ? "pull(ret)" : "ret" }; }\n` +
                 '    ptr ret = i <= mem[mem[n].l].sz ? deli(mem[n].l, i) : deli(mem[n].r, i - 1 - mem[mem[n].l].sz);\n';
             if (pull) code += '    pull(n);\n';
             code += '    return ret;\n' +
