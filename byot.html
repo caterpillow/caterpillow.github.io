@@ -1149,7 +1149,7 @@ Warnings:
             code += 'ptr deli(ptr& n, int i) {\n' +
                 '    if (!n) return nullptr;\n'
             if (push) code += '    push(n);\n'
-            code += `    if (i == sz(n->l)) { ptr ret = n; n = merge(n->l, n->r); ret->l = ret->r = ${par_option ? "ret->par = " : ""}nullptr; return ${pull ? "pull(ret)" : "ret"};\n` +
+            code += `    if (i == sz(n->l)) { ptr ret = n; n = merge(n->l, n->r); ret->l = ret->r = ${par_option ? "ret->par = " : ""}nullptr; return ${pull ? "pull(ret)" : "ret"}; }\n` +
                 '    ptr ret = i <= sz(n->l) ? deli(n->l, i) : deli(n->r, i - 1 - sz(n->l));\n'
             if (pull) code += '    pull(n);\n'
             code += '    return ret;\n' +
