@@ -1256,7 +1256,7 @@ Warnings:
 
         if (unite_fast_option) {
             if (comments) code += '// fast in practice (i think?)'
-            coder += 'ptr unite_fast(ptr l, ptr r) {\n' +
+            code += 'ptr unite_fast(ptr l, ptr r) {\n' +
                 '    if (!l || !r) return l ? l : r;\n'
             if (push) code += '    push(l), push(r);\n'
             code += '    if (l->pri < r->pri) std::swap(l, r);\n' +
