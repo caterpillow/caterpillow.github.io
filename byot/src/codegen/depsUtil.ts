@@ -1,4 +1,18 @@
 import { edges, mutualExclusions } from './features'
+import { features } from './features'
+
+// Helper to determine if a dependency is satisfied (including selects with 'none')
+function isDepSatisfied(config: Record<string, boolean|string>, dep: string): boolean {
+  const feature = features.find(f => f.key === dep);
+  if (feature && feature.type === 'select') {
+    const val = config[dep] as string | undefined;
+    const defaultVal = feature.options?.[0]?.value;
+    // Treat 'none' or first select option as not enabled
+    return !!val && val !== defaultVal;
+  }
+  // For checkboxes / others, just boolean
+  return !!config[dep];
+}
 
 // Topological sort to order features based on dependency edges
 export function topsort(pairs: Array<[string, string]>): string[] {
@@ -27,15 +41,12 @@ export function topsort(pairs: Array<[string, string]>): string[] {
   return sorted;
 }
 
-// Determine if a feature should be disabled based on dependencies
+// Determine if a feature should be disabled based on dependencies (fix for selects)
 export function computeDisabled(config: Record<string, boolean|string>) {
-  // Mark all features as enabled by default
   const disabled: Record<string, boolean> = {};
-  // For each edge, if dependency not satisfied, disable
   for (const [id, dep] of edges) {
-    if (!config[dep]) disabled[id] = true;
+    if (!isDepSatisfied(config, dep)) disabled[id] = true;
   }
-  // Mutual exclusions: If one is selected, disable the other
   for (const [id1, id2] of mutualExclusions) {
     if (config[id1]) disabled[id2] = true;
     if (config[id2]) disabled[id1] = true;

@@ -8,10 +8,9 @@ interface ToggleGroupProps {
   setConfig: (c: Record<string, boolean|String>) => void;
   disabledMap?: Record<string, boolean>;
   enableDependencies?: (id: string) => void;
-  bigInputs?: boolean;
 }
 
-export function ToggleGroup({ groupName, features, config, setConfig, disabledMap, enableDependencies, bigInputs }: ToggleGroupProps) {
+export function ToggleGroup({ groupName, features, config, setConfig, disabledMap, enableDependencies }: ToggleGroupProps) {
   function onCheckboxChange(k: string) {
     setConfig({ ...config, [k]: !config[k] });
   }
@@ -31,15 +30,17 @@ export function ToggleGroup({ groupName, features, config, setConfig, disabledMa
     if (disabledMap?.[k]) return;
     setConfig({ ...config, [k]: e.target.value });
   }
-  const checkboxSizeClass = bigInputs ? "w-6 h-6" : "w-4 h-4";
-  const selectClass = bigInputs ? "border rounded px-2 py-2 min-w-[6rem] text-base" : "border rounded px-1 py-0.5 min-w-[6rem]";
+  // Standardized but refined sizing (not too giant)
+  const checkboxSizeClass = "w-5 h-5 flex-shrink-0";
+  const selectClass = "border rounded px-2 py-1.5 min-w-[7.6rem] text-base leading-6 flex-shrink-0";
+  const labelClass = "flex items-center gap-3 mb-3 cursor-pointer group leading-6";
   return (
-    <fieldset className={bigInputs ? "mb-4" : "mb-2"}>
+    <fieldset className="mb-4">
       <legend className="block mb-1 font-semibold text-sm">{groupName}</legend>
       {features.map(f => (
         f.type === "select" ? (
-          <div key={f.key} className="flex items-center gap-2 mb-2">
-            <label className="font-medium mr-2" htmlFor={`sel-${f.key}`}>{f.label}</label>
+          <div key={f.key} className="flex items-center gap-2 mb-3">
+            <label className="font-medium mr-2 min-w-fit" htmlFor={`sel-${f.key}`}>{f.label}</label>
             <select
               id={`sel-${f.key}`}
               value={config[f.key] as string || (f.options && f.options[0]?.value) || ""}
@@ -53,7 +54,7 @@ export function ToggleGroup({ groupName, features, config, setConfig, disabledMa
             </select>
           </div>
         ) : (
-          <label key={f.key} className="flex items-center gap-2 mb-2 cursor-pointer group" htmlFor={`chk-${f.key}`}>
+          <label key={f.key} className={labelClass} htmlFor={`chk-${f.key}`}>
             <input
               id={`chk-${f.key}`}
               type="checkbox"

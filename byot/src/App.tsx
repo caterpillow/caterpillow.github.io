@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { features, edges } from "./codegen/features";
 import { computeDisabled } from "./codegen/depsUtil";
 import { ToggleGroup } from "./components/ToggleGroup";
@@ -37,6 +37,23 @@ export default function App() {
   const [config, setConfig] = useState(defaultConfig());
   const disabled = computeDisabled(config);
   const prereqs = prereqMap();
+  const columns = splitSectionsIntoColumns(SECTIONS);
+
+  // Reset disabled selects to default value (None) immediately when they get disabled
+  useEffect(() => {
+    let needsReset = false;
+    const newConfig = { ...config };
+    features.forEach(f => {
+      if (f.type === "select" && disabled[f.key]) {
+        if (newConfig[f.key] !== f.options?.[0]?.value) {
+          newConfig[f.key] = f.options?.[0]?.value;
+          needsReset = true;
+        }
+      }
+    });
+    if (needsReset) setConfig(newConfig);
+    // eslint-disable-next-line
+  }, [disabled]);
 
   function enableDependencies(key: string) {
     let newConfig = { ...config };
@@ -74,19 +91,16 @@ export default function App() {
     setConfig(newConfig);
   }
 
-  // Split sections into three columns
-  const columns = splitSectionsIntoColumns(SECTIONS);
-
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center py-4">
       <h1 className="text-4xl font-bold mb-4 text-blue-700 text-center">Build Your Own Treap <span className="text-base font-normal">(BYOT Next)</span></h1>
-      <div className="w-full max-w-7xl flex flex-col md:flex-row gap-6 mt-4">
-        {/* Wider settings: 70% of container, each card min-w-[220px] for less cramming */}
-        <div className="flex w-full md:w-[70%] gap-4">
+      <div className="w-full flex flex-row gap-8 justify-center mt-4">
+        {/* Settings: 3 buffed cards, code card exactly 2x width (desktop only layout). */}
+        <div className="flex flex-row gap-6 flex-none">
           {columns.map((sectionList, idx) => (
             <aside
               key={idx}
-              className="flex-1 min-w-[260px] bg-white rounded-lg shadow p-5 flex flex-col gap-4 max-h-[80vh] overflow-y-auto"
+              className="w-[350px] flex-none bg-white border border-gray-300 rounded-lg shadow p-6 flex flex-col gap-4 min-h-[600px]"
             >
               {sectionList.map(section => (
                 <ToggleGroup
@@ -97,20 +111,19 @@ export default function App() {
                   setConfig={setConfig}
                   disabledMap={disabled}
                   enableDependencies={enableDependencies}
-                  bigInputs
+                  bigInputs={false}
                 />
               ))}
             </aside>
           ))}
         </div>
-        {/* Main Content: Code & Preset Chooser */}
-        <main className="flex-1 bg-white rounded-lg shadow p-6 min-h-[350px]">
-          <div className="flex flex-col gap-2">
+        <main className="w-[700px] flex-none bg-white border border-gray-300 rounded-lg shadow p-6 min-h-[600px] max-w-full">
+          <div className="flex flex-col gap-2 h-full">
             <div className="flex items-center justify-between mb-2">
               <div className="font-semibold">Resulting Code</div>
               {/* TODO: Add preset buttons and copy actions here */}
             </div>
-            <pre className="bg-gray-900 text-green-200 p-2 rounded overflow-x-auto text-xs min-h-[18rem]">
+            <pre className="bg-gray-900 text-green-200 p-2 rounded overflow-x-auto text-xs min-h-[18rem] h-full">
 {generateTreapCode(config)}
             </pre>
           </div>

@@ -145,6 +145,7 @@ export const edges: Array<[string, string]> = [
   ["range_min", "range_agg"],
   ["range_min", "val_type"],
   ["key_sum", "range_agg"],
+  ["range_agg", "val_type"],
   ["plus_merge_option", "merge_option"],
   ["order_option", "par_option"],
   ["order_option", "size_option"],
