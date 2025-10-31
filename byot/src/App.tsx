@@ -13,6 +13,15 @@ function defaultConfig() {
     if (f.type === "select") cfg[f.key] = f.options?.[0]?.value || "";
     else cfg[f.key] = false;
   }
+  // derived
+  cfg.pull = false;
+  cfg.push = false;
+  return cfg;
+}
+
+function derive(cfg: Record<string, any>) {
+  cfg.pull = !!(cfg.size_option || cfg.range_agg || cfg.par_option);
+  cfg.push = !!cfg.lazy_prop;
   return cfg;
 }
 
@@ -34,7 +43,7 @@ function splitSectionsIntoColumns<T>(sections: T[]): T[][] {
 }
 
 export default function App() {
-  const [config, setConfig] = useState(defaultConfig());
+  const [config, setConfig] = useState(derive(defaultConfig()));
   const disabled = computeDisabled(config);
   const prereqs = prereqMap();
   const columns = splitSectionsIntoColumns(SECTIONS);
@@ -51,7 +60,7 @@ export default function App() {
         }
       }
     });
-    if (needsReset) setConfig(newConfig);
+    if (needsReset) setConfig(derive(newConfig));
     // eslint-disable-next-line
   }, [disabled]);
 
@@ -88,7 +97,7 @@ export default function App() {
         newConfig[key] = true;
       }
     }
-    setConfig(newConfig);
+    setConfig(derive(newConfig));
   }
 
   return (
@@ -108,7 +117,7 @@ export default function App() {
                   groupName={section}
                   features={features.filter(f => f.section === section)}
                   config={config}
-                  setConfig={setConfig}
+                  setConfig={c => setConfig(derive({ ...c }))}
                   disabledMap={disabled}
                   enableDependencies={enableDependencies}
                   bigInputs={false}

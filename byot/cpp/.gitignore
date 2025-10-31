@@ -1,0 +1,25 @@
+# Binaries / executables
+*.exe
+*.out
+a.out
+base
+
+# Object files / intermediates
+*.o
+*.obj
+*.lo
+*.la
+*.a
+*.lib
+*.dll
+*.so
+*.dylib
+
+# Debug / cores
+core
+*.stackdump
+
+# Build directories
+/build/
+/bin/
+/dist/

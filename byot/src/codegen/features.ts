@@ -31,6 +31,10 @@ export const features: FeatureMeta[] = [
     { value: "inc exc", label: "inc exc" },
     { value: "inc inc", label: "inc inc" },
   ] },
+  // Pointer / Iterators
+  { key: "augmented_ptr", label: "Augmented pointer (iterable ptr)", section: "Pointer/Iterators", tooltip: "Wrap Node* in ptr with operators and optional iteration" },
+  { key: "succ", label: "Enable succ (successor)", section: "Pointer/Iterators" },
+  { key: "pred", label: "Enable pred (predecessor)", section: "Pointer/Iterators" },
   // Merge options
   { key: "merge_option", label: "Include merge", section: "Core" },
   { key: "n_merge_option", label: "Include n-way merge", section: "Core" },
@@ -190,6 +194,9 @@ export const edges: Array<[string, string]> = [
   ["cumulative_partition_index", "size_option"],
   ["cumulative_partition_index", "range_agg"],
   ["treap_beats", "val_type"],
+  // New dependencies for iterator helpers
+  ["succ", "par_option"],
+  ["pred", "par_option"],
 ];
 
 // Mutual exclusions
