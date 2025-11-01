@@ -14,6 +14,10 @@ build/
 wip-deploy/
 *.local
 
+# Allow wip/byot.html and wip/assets/ (the built page we want to serve)
+!wip/byot.html
+!wip/assets/
+
 # Environment variables
 .env
 .env.local

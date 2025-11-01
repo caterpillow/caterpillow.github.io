@@ -9,9 +9,24 @@ This is the next-gen version of the BYOT code generator. Features:
 
 ## Local Dev
 
-```
-yarn install    # or npm install
-yarn dev        # or npm run dev
+```bash
+npm install
+npm run dev
 ```
 
 Edit `src/codegen/treapConfig.ts` to grow the feature and codegen system.
+
+## Building for GitHub Pages
+
+To compile this into a static HTML page viewable at `https://caterpillow.github.io/wip/byot.html`:
+
+```bash
+npm run build:page
+```
+
+This will:
+1. Build the React app
+2. Copy the output to `../wip/byot.html` and `../wip/assets/`
+3. You can then commit and push these files
+
+The built page will work as a standalone static file - no server needed!

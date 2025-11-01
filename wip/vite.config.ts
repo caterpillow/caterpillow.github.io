@@ -5,11 +5,8 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  // Set base path for GitHub Pages
-  // If your repo is 'caterpillow.github.io-1', change this to '/caterpillow.github.io-1/'
-  // If deploying to root, use '/'
-  // If deploying to /wip subdirectory, use '/wip/'
-  base: process.env.VITE_BASE_PATH || '/',
+  // Base path for assets - relative to where byot.html will be located
+  base: './',
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
