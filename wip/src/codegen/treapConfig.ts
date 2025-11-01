@@ -66,12 +66,12 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
       }
       if (cfg.plus_merge_option) {
         s += '\n';
-        s += '    friend ptr operator+(ptr &lhs, ptr &rhs) { ptr res = merge(lhs, rhs); lhs.p = rhs.p = nullptr; return res; }\n';
-        s += '    friend ptr operator+(ptr &lhs, ptr &&rhs) { ptr res = merge(lhs, rhs); lhs.p = nullptr; return res; }\n';
-        s += '    friend ptr operator+(ptr &&lhs, ptr &rhs) { ptr res = merge(lhs, rhs); rhs.p = nullptr; return res; }\n';
-        s += '    friend ptr operator+(ptr &&lhs, ptr &&rhs) { return merge(lhs, rhs); }\n';
-        s += '    friend ptr &operator+=(ptr &lhs, ptr &rhs) { lhs = merge(lhs, rhs); rhs.p = nullptr; return lhs; }\n';
-        s += '    friend ptr &operator+=(ptr &lhs, ptr &&rhs) { return lhs = merge(lhs, rhs); }\n';
+        s += `    friend ptr operator+(ptr &lhs, ptr &rhs) { ptr res = merge(lhs, rhs); ${cfg.safe_merge_plus ? "lhs.p = rhs.p = nullptr; " : ""}return res; }\n`;
+        s += `    friend ptr operator+(ptr &lhs, ptr &&rhs) { ptr res = merge(lhs, rhs); ${cfg.safe_merge_plus ? "lhs.p = nullptr; " : ""}return res; }\n`;
+        s += `    friend ptr operator+(ptr &&lhs, ptr &rhs) { ptr res = merge(lhs, rhs); ${cfg.safe_merge_plus ? "rhs.p = nullptr; " : ""}return res; }\n`;
+        s += `    friend ptr operator+(ptr &&lhs, ptr &&rhs) { return merge(lhs, rhs); }\n`;
+        s += `    friend ptr &operator+=(ptr &lhs, ptr &rhs) { lhs = merge(lhs, rhs); ${cfg.safe_merge_plus ? "rhs.p = nullptr; " : ""}return lhs; }\n`;
+        s += `    friend ptr &operator+=(ptr &lhs, ptr &&rhs) { return lhs = merge(lhs, rhs); }\n`;
       }
       s += '\n';
       s += '    inline ptr begin() { return mn(*this); }\n';
@@ -308,6 +308,16 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     return s;
   },
 
+  safeMergeFn: (cfg) => {
+    if (!cfg.safe_merge_option) return '';
+    let s = '';
+    s += `ptr safe_merge(ptr &lhs, ptr &rhs) { ptr res = merge(lhs, rhs); lhs.p = rhs.p = nullptr; return res; }\n`;
+    s += `ptr safe_merge(ptr &lhs, ptr &&rhs) { ptr res = merge(lhs, rhs); lhs.p = nullptr; return res; }\n`;
+    s += `ptr safe_merge(ptr &&lhs, ptr &rhs) { ptr res = merge(lhs, rhs); rhs.p = nullptr; return res; }\n`;
+    s += `ptr safe_merge(ptr &&lhs, ptr &&rhs) { return merge(lhs, rhs); }\n`;
+    return s;
+  },
+
   splitFn: (cfg) => {
     if (!cfg.split_option) return '';
     const h = helpers(cfg);
@@ -319,7 +329,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     s += `    if (k <= n->key) split(n->l, k, l, n->l), ${h.pull('r = n')};\n`;
     s += `    else split(n->r, k, n->r, r), ${h.pull('l = n')};\n`;
     s += '}\n\n';
-    s += 'pair<ptr, ptr> split(ptr n, int k) { ptr l, r; split(n, k, l, r); return {l, r}; }\n\n';
+    s += 'std::pair<ptr, ptr> split(ptr n, int k) { ptr l, r; split(n, k, l, r); return {l, r}; }\n\n';
     return s;
   },
 
@@ -482,7 +492,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     out += `    if (i <= sz(n->l)) spliti(n->l, i, l, n->l), ${h.pull('r = n')};\n`;
     out += `    else spliti(n->r, i - 1 - sz(n->l), n->r, r), ${h.pull('l = n')};\n`;
     out += '}\n\n';
-    out += 'pair<ptr, ptr> spliti(ptr n, int i) { ptr l, r; spliti(n, i, l, r); return {l, r}; }\n\n';
+    out += 'std::pair<ptr, ptr> spliti(ptr n, int i) { ptr l, r; spliti(n, i, l, r); return {l, r}; }\n\n';
     return out;
   },
   modFn: (cfg) => {
@@ -998,7 +1008,7 @@ const ORDER = [
   'nodeStruct',
   'valueUpd',
   'szFn', 'aggFn',
-  'pushFn', 'pullFn', 'mergeFn', 'nMergeFn', 'splitFn',
+  'pushFn', 'pullFn', 'mergeFn', 'safeMergeFn', 'nMergeFn', 'splitFn',
   'threeSplit', 'findFn', 'findiFn', 'insFn', 'delFn', 'delAllFn', 'insiFn', 'deliFn', 'minFn', 'maxFn',
   'threeSplitIndex','splitiFn','modFn','modIndexFn', 'rotateFn',
   'succFn','predFn', 'cleanFn', 'orderFn', 'rootFn',
@@ -1028,7 +1038,7 @@ export function generateTreapCode(cfg: TreapConfig): string {
     if (cfg.use_namespace_std) prefix += 'using namespace std;\n';
     if (cfg.use_ll_typedef) prefix += 'using ll = long long;\n\n';
     code = prefix + code;
-    code += '\n\nmain() {\n';
+    code += '\n\nint main() {\n';
     code += '    cin.tie(0)->sync_with_stdio(0);\n';
     code += '    \n';
     code += '}\n';

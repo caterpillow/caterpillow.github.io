@@ -13,6 +13,9 @@ function defaultConfig() {
     if (f.type === "select") cfg[f.key] = f.options?.[0]?.value || "";
     else cfg[f.key] = false;
   }
+  // Override defaults for specific settings
+  cfg.use_namespace_std = true;
+  cfg.tab_char = "4spaces";
   // derived
   cfg.pull = false;
   cfg.push = false;

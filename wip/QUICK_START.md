@@ -1,6 +1,27 @@
 # Quick Start - Getting Your Page Live
 
-## Step 1: Build (Already Done ✅)
+## To Update After Making Changes
+
+1. **Rebuild the page:**
+   ```bash
+   cd wip
+   npm run build:page
+   ```
+
+2. **Commit and push:**
+   ```bash
+   git add wip/byot.html wip/assets/
+   git commit -m "Update BYOT page"
+   git push
+   ```
+
+3. **Wait 1-2 minutes** and your changes will be live at: https://caterpillow.github.io/wip/byot.html
+
+---
+
+## Initial Setup (Already Done ✅)
+
+## Step 1: Build
 ```bash
 npm run build:page
 ```

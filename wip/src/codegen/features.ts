@@ -6,6 +6,7 @@ export interface FeatureMeta {
   tooltip?: string;
   type?: "checkbox" | "select";
   options?: Array<{ value: string, label: string }>;
+  subOptionOf?: string; // If set, this is a suboption that only appears when parent is enabled
 }
 
 // All toggles and selects from byot.html
@@ -20,9 +21,9 @@ export const features: FeatureMeta[] = [
   { key: "namespace_treap", label: "Wrap in namespace Treap", section: "Namespaces & Typedefs" },
   // Style
   { key: "tab_char", label: "Choose tab character", section: "Style", type: "select", options: [
-    { value: "4spaces", label: "4 spaces" },
     { value: "2spaces", label: "2 spaces" },
-    { value: "3spaces", label: "3 spaces" },
+    // { value: "3spaces", label: "3 spaces" },
+    { value: "4spaces", label: "4 spaces" },
     { value: "8spaces", label: "8 spaces (wtf)" },
     { value: "tab", label: "Tab" },
   ] },
@@ -37,8 +38,10 @@ export const features: FeatureMeta[] = [
   { key: "pred", label: "Enable pred (predecessor)", section: "Pointer/Iterators" },
   // Merge options
   { key: "merge_option", label: "Include merge", section: "Core" },
+  { key: "safe_merge_option", label: "Include safe merge", section: "Core", tooltip: "When merging an lvalue, it will set its pointer to null." },
   { key: "n_merge_option", label: "Include n-way merge", section: "Core" },
   { key: "plus_merge_option", label: "Include + merge", section: "Core" },
+  { key: "safe_merge_plus", label: "Safe merge", section: "Core", subOptionOf: "plus_merge_option", tooltip: "When merging an lvalue, it will set its pointer to null." },
   // Key type & split options
   { key: "key_type", label: "Choose key type", section: "Key/Index", type: "select", options: [
     { value: "none", label: "None" },
@@ -121,6 +124,7 @@ export const edges: Array<[string, string]> = [
   ["spliti_option", "size_option"],
   ["insi_option", "spliti_option"],
   ["findi_option", "size_option"],
+  ["safe_merge_option", "merge_option"],
   ["n_merge_option", "merge_option"],
   ["n_merge_option", "namespace_treap"],
   ["range_add", "lazy_prop"],
@@ -154,6 +158,7 @@ export const edges: Array<[string, string]> = [
   ["range_agg", "val_type"],
   ["plus_merge_option", "merge_option"],
   ["plus_merge_option", "augmented_ptr"],
+  ["safe_merge_plus", "plus_merge_option"],
   ["order_option", "par_option"],
   ["order_option", "size_option"],
   ["clean_option", "par_option"],
