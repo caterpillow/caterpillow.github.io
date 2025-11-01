@@ -37,12 +37,12 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
       s += 'struct ptr {\n';
       if (cfg.succ || cfg.pred) {
         s += '    using iterator_category = std::bidirectional_iterator_tag;\n';
-        s += '    using value_type        = Node;\n';
-        s += '    using difference_type   = std::ptrdiff_t;\n';
-        s += '    using pointer           = Node*;\n';
-        s += '    using reference         = Node&;\n';
+        s += '    using value_type = Node;\n';
+        s += '    using difference_type = std::ptrdiff_t;\n';
+        s += '    using pointer = Node*;\n';
+        s += '    using reference = Node&;\n';
         s += '#if __cpp_lib_concepts\n';
-        s += '    using iterator_concept  = std::bidirectional_iterator_tag;\n';
+        s += '    using iterator_concept = std::bidirectional_iterator_tag;\n';
         s += '#endif\n';
         s += '\n\n';
       }

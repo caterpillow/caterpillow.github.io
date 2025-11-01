@@ -3,6 +3,7 @@ import { features, edges } from "./codegen/features";
 import { computeDisabled } from "./codegen/depsUtil";
 import { ToggleGroup } from "./components/ToggleGroup";
 import { generateTreapCode } from "./codegen/treapConfig";
+import { TODO_TEXT } from "./TODO";
 
 // Sections (group the toggles by these)
 const SECTIONS = Array.from(new Set(features.map(f => f.section)));
@@ -245,7 +246,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center py-4">
-      <h1 className="text-4xl font-bold mb-4 text-blue-700 text-center">Build Your Own Treap <span className="text-base font-normal">(BYOT Next)</span></h1>
+      <h1 className="text-4xl font-bold mb-4 text-blue-700 text-center">Build Your Own Treap</h1>
       <div className="w-full flex flex-row gap-8 justify-center mt-4">
         {/* Settings: 3 buffed cards, code card exactly 2x width (desktop only layout). */}
         <div className="flex flex-row gap-6 flex-none">
@@ -309,7 +310,9 @@ export default function App() {
           </div>
         </main>
       </div>
-      <footer className="mt-5 text-gray-400 text-xs">&copy; 2025 caterpillow | <a className="underline" href="https://codeforces.com/blog/entry/136858" target="_blank" rel="noopener noreferrer">Codeforces Blogpost</a></footer>
+      <footer className="mt-5 text-gray-400 text-xs">
+        &copy; 2025 caterpillow | <a className="underline" href="https://codeforces.com/blog/entry/136858" target="_blank" rel="noopener noreferrer">Codeforces Blogpost</a> | <span className="underline cursor-help" title={TODO_TEXT}>TODO</span>
+      </footer>
     </div>
   );
 }
