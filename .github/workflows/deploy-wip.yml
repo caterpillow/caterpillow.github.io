@@ -1,0 +1,59 @@
+name: Deploy WIP to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main  # Change to 'master' if your default branch is 'master'
+    paths:
+      - 'wip/**'
+  workflow_dispatch:  # Allows manual triggering
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: wip/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./wip
+        run: npm ci
+
+      - name: Build
+        working-directory: ./wip
+        # Set base path for GitHub Pages - adjust if your repo name differs
+        # For repo 'caterpillow.github.io-1', the base would be '/caterpillow.github.io-1/'
+        # For root deployment, use '/' (or remove this env var)
+        run: npm run build
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './wip/dist'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
