@@ -84,7 +84,7 @@ function parseArgs(argv) {
 }
 
 function derive(cfg) {
-  return {
+  const out = {
     signature: false,
     comments: false,
     template: false,
@@ -97,9 +97,16 @@ function derive(cfg) {
     val_type: "none",
     ...cfg,
     augmented_ptr: Boolean(cfg.augmented_ptr || cfg.array_storage),
-    pull: Boolean(cfg.size_option || cfg.range_agg || cfg.par_option),
     push: Boolean(cfg.lazy_prop),
   };
+  if (out.persistent) {
+    out.size_biased_merge = true;
+    out.merge_option = true;
+    out.size_option = true;
+  }
+  if (out.size_biased_merge) out.size_option = true;
+  out.pull = Boolean(out.size_option || out.range_agg || out.par_option);
+  return out;
 }
 
 function baseCppConfig(overrides = {}) {
@@ -227,6 +234,30 @@ function buildCompileCases() {
       name: "array-storage-index-lazy",
       config: arrayStorageIndexConfig(),
     },
+    {
+      name: "size-biased-key-core",
+      config: baseCppConfig({
+        key_type: "int",
+        merge_option: true,
+        size_option: true,
+        size_biased_merge: true,
+        split_option: true,
+        ins_option: true,
+        del_option: true,
+      }),
+    },
+    {
+      name: "persistent-index-lazy",
+      config: persistentIndexConfig({ array_storage: false }),
+    },
+    {
+      name: "persistent-array-index-lazy",
+      config: persistentIndexConfig({ array_storage: true }),
+    },
+    {
+      name: "persistent-parent-order",
+      config: persistentIndexConfig({ par_option: true, order_option: true, root_option: true }),
+    },
   ];
 
   return cases;
@@ -263,6 +294,16 @@ function buildStressCases() {
       name: "stress-array-storage-index",
       config: arrayStorageIndexConfig(),
       body: indexStressBody("inc exc"),
+    },
+    {
+      name: "stress-persistent-index",
+      config: persistentIndexConfig({ array_storage: false, par_option: true }),
+      body: persistentIndexStressBody(),
+    },
+    {
+      name: "stress-persistent-array-index",
+      config: persistentIndexConfig({ array_storage: true, par_option: true }),
+      body: persistentIndexStressBody(),
     },
   ];
 }
@@ -350,6 +391,19 @@ function arrayStorageIndexConfig() {
     array_storage: true,
     array_storage_size: "1 << 17",
     augmented_ptr: true,
+  };
+}
+
+function persistentIndexConfig(overrides = {}) {
+  return {
+    ...indexLazyConfig("inc exc"),
+    persistent: true,
+    size_biased_merge: true,
+    merge_option: true,
+    size_option: true,
+    array_storage_size: "1 << 18",
+    ...overrides,
+    augmented_ptr: Boolean(overrides.augmented_ptr || overrides.array_storage),
   };
 }
 
@@ -587,6 +641,108 @@ int main() {
     }
     if (check_all()) return 1;
     delete root;
+}
+`;
+}
+
+function persistentIndexStressBody() {
+  return `
+int main() {
+    mt19937 rng(314159);
+    vector<ptr> roots;
+    vector<vector<long long>> states;
+
+    ptr root = nullptr;
+    vector<long long> brute;
+    for (int i = 0; i < 12; i++) {
+        long long val = uniform_int_distribution<int>(-20, 20)(rng);
+        root = merge(root, new Node(Value{val}));
+        brute.push_back(val);
+    }
+    roots.push_back(root);
+    states.push_back(brute);
+
+    auto brute_sum = [](const vector<long long>& a, int l, int r) {
+        long long res = 0;
+        for (int i = l; i < r; i++) res += a[i];
+        return res;
+    };
+    auto check_version = [&](int id) {
+        const auto& a = states[id];
+        ptr rt = roots[id];
+        if (sz(rt) != (int)a.size()) {
+            cerr << "persistent size mismatch version=" << id << " got=" << sz(rt) << " exp=" << a.size() << "\\n";
+            return 1;
+        }
+        for (int rep = 0; rep < 8; rep++) {
+            int n = (int)a.size();
+            int l = n ? uniform_int_distribution<int>(0, n - 1)(rng) : 0;
+            int r = n ? uniform_int_distribution<int>(l + 1, n)(rng) : 0;
+            long long got = queryi(rt, l, r).sum;
+            long long exp = brute_sum(a, l, r);
+            if (got != exp) {
+                cerr << "persistent query mismatch version=" << id << " l=" << l << " r=" << r << " got=" << got << " exp=" << exp << "\\n";
+                return 1;
+            }
+        }
+        return 0;
+    };
+
+    for (int step = 0; step < 260; step++) {
+        int base = uniform_int_distribution<int>(0, (int)roots.size() - 1)(rng);
+        ptr cur = roots[base];
+        vector<long long> now = states[base];
+        int n = (int)now.size();
+        int op = uniform_int_distribution<int>(0, n == 0 ? 1 : 5)(rng);
+
+        if (op == 0 && n < 32) {
+            int pos = uniform_int_distribution<int>(0, n)(rng);
+            long long val = uniform_int_distribution<int>(-25, 25)(rng);
+            insi(cur, new Node(Value{val}), pos);
+            now.insert(now.begin() + pos, val);
+        } else if (op == 1 && n > 0) {
+            int pos = uniform_int_distribution<int>(0, n - 1)(rng);
+            (void)deli(cur, pos);
+            now.erase(now.begin() + pos);
+        } else if (n > 0) {
+            int l = uniform_int_distribution<int>(0, n - 1)(rng);
+            int r = uniform_int_distribution<int>(l + 1, n)(rng);
+            if (op == 2) {
+                Lazy lazy = lid;
+                lazy.val = uniform_int_distribution<int>(-8, 8)(rng);
+                lazy.inc = true;
+                updi(cur, l, r, lazy);
+                for (int i = l; i < r; i++) now[i] += lazy.val;
+            } else if (op == 3) {
+                Lazy lazy = lid;
+                lazy.val = uniform_int_distribution<int>(-18, 18)(rng);
+                lazy.inc = false;
+                updi(cur, l, r, lazy);
+                for (int i = l; i < r; i++) now[i] = lazy.val;
+            } else if (op == 4) {
+                reversei(cur, l, r);
+                reverse(now.begin() + l, now.begin() + r);
+            } else {
+                long long got = queryi(cur, l, r).sum;
+                long long exp = brute_sum(now, l, r);
+                if (got != exp) {
+                    cerr << "persistent live query mismatch step=" << step << " got=" << got << " exp=" << exp << "\\n";
+                    return 1;
+                }
+            }
+        }
+
+        roots.push_back(cur);
+        states.push_back(now);
+        if (check_version((int)roots.size() - 1)) return 1;
+        if (check_version(base)) return 1;
+        int old = uniform_int_distribution<int>(0, (int)roots.size() - 1)(rng);
+        if (check_version(old)) return 1;
+    }
+
+    for (int id : {0, (int)roots.size() / 2, (int)roots.size() - 1}) {
+        if (check_version(id)) return 1;
+    }
 }
 `;
 }

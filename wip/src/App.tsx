@@ -25,6 +25,12 @@ function defaultConfig() {
 
 function derive(cfg: Record<string, any>) {
   if (cfg.array_storage) cfg.augmented_ptr = true;
+  if (cfg.persistent) {
+    cfg.size_biased_merge = true;
+    cfg.merge_option = true;
+    cfg.size_option = true;
+  }
+  if (cfg.size_biased_merge) cfg.size_option = true;
   cfg.pull = !!(cfg.size_option || cfg.range_agg || cfg.par_option);
   cfg.push = !!cfg.lazy_prop;
   return cfg;
@@ -248,7 +254,7 @@ export default function App() {
     <div className="min-h-screen bg-gray-100 flex flex-col items-center py-4">
       <h1 className="text-4xl font-bold mb-4 text-blue-700 text-center">Build Your Own Treap</h1>
       <div className="max-w-[1770px] mx-4 rounded border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-gray-800">
-        Pick the treap features you want and the generated C++ updates immediately. Disabled controls are waiting on prerequisites; double-click a label or right-click the checbkbox of a disabled option to enable those prerequisites automatically.
+        Pick the treap features you want and the generated C++ updates immediately. Disabled controls are waiting on prerequisites; double-click a disabled option to enable its prerequisites automatically. Right-click also works on supported browsers.
       </div>
       <div className="w-full flex flex-row gap-8 justify-center mt-4">
         {/* Settings: 3 buffed cards, code card exactly 2x width (desktop only layout). */}

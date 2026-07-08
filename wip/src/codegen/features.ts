@@ -15,6 +15,7 @@ export const features: FeatureMeta[] = [
   { key: "signature", label: "Include site tag (pls)", section: "Misc" },
   { key: "comments", label: "Include comments", section: "Misc" },
   { key: "template", label: "Include template (for testing)", section: "Misc" },
+  { key: "persistent", label: "Persistent treap", section: "Misc", tooltip: "Keeps old versions valid by cloning before mutation. Requires randomized size merge; array storage is recommended for faster persistent allocation." },
   // Namespaces & Typedefs
   { key: "use_namespace_std", label: "Use namespace std", section: "Namespaces & Typedefs" },
   { key: "use_ll_typedef", label: "Use ll = long long", section: "Namespaces & Typedefs" },
@@ -49,6 +50,7 @@ export const features: FeatureMeta[] = [
   { key: "pred", label: "Enable pred (predecessor)", section: "Pointer/Iterators" },
   // Merge options
   { key: "merge_option", label: "Include merge", section: "Core" },
+  { key: "size_biased_merge", label: "Randomized size merge", section: "Core", tooltip: "Merge chooses the root proportional to subtree sizes instead of storing node priorities. Required for persistence." },
   { key: "safe_merge_option", label: "Include safe merge", section: "Core", tooltip: "When merging an lvalue, it will set its pointer to null." },
   { key: "n_merge_option", label: "Include n-way merge", section: "Core" },
   { key: "plus_merge_option", label: "Include + merge", section: "Core" },
@@ -136,6 +138,9 @@ export const edges: Array<[string, string]> = [
   ["insi_option", "spliti_option"],
   ["findi_option", "size_option"],
   ["safe_merge_option", "merge_option"],
+  ["size_biased_merge", "merge_option"],
+  ["size_biased_merge", "size_option"],
+  ["persistent", "size_biased_merge"],
   ["n_merge_option", "merge_option"],
   ["n_merge_option", "namespace_treap"],
   ["range_add", "lazy_prop"],
@@ -223,6 +228,7 @@ export const edges: Array<[string, string]> = [
 
 // Mutual exclusions
 export const mutualExclusions: Array<[string, string]> = [
+  ["persistent", "treap_beats"],
   ["treap_beats", "range_sum"],
   ["treap_beats", "range_min"],
   ["treap_beats", "range_max"],
