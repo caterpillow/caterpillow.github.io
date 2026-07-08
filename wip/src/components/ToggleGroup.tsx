@@ -4,8 +4,8 @@ import { FeatureMeta } from "../codegen/features";
 interface ToggleGroupProps {
   groupName: string;
   features: FeatureMeta[];
-  config: Record<string, boolean|String>;
-  setConfig: (c: Record<string, boolean|String>) => void;
+  config: Record<string, boolean|string>;
+  setConfig: (c: Record<string, boolean|string>) => void;
   disabledMap?: Record<string, boolean>;
   enableDependencies?: (id: string) => void;
   flashStates?: Record<string, 'enabled' | 'disabled' | null>;
@@ -15,17 +15,15 @@ export function ToggleGroup({ groupName, features, config, setConfig, disabledMa
   function onCheckboxChange(k: string) {
     setConfig({ ...config, [k]: !config[k] });
   }
-  function onCheckboxContextMenu(e: React.MouseEvent<HTMLInputElement>, k: string) {
+  function onFeatureContextMenu(e: React.MouseEvent, k: string) {
     e.preventDefault();
     if (enableDependencies) enableDependencies(k);
   }
-  function onCheckboxDoubleClick(e: React.MouseEvent<HTMLInputElement>, k: string) {
+  function onFeatureDoubleClick(e: React.MouseEvent, k: string) {
     if (disabledMap?.[k]) {
       e.preventDefault();
       if (enableDependencies) enableDependencies(k);
-      return;
     }
-    onCheckboxChange(k);
   }
   function setDrop(e: React.ChangeEvent<HTMLSelectElement>, k: string) {
     if (disabledMap?.[k]) return;
@@ -52,16 +50,20 @@ export function ToggleGroup({ groupName, features, config, setConfig, disabledMa
 
   function renderFeature(f: typeof features[0]) {
     if (f.type === "select") {
+      const isDisabled = !!disabledMap?.[f.key];
       return (
-        <div key={f.key} className={`flex items-center gap-2 mb-3 ${getFlashClass(f.key)}`}>
+        <div
+          key={f.key}
+          className={`flex items-center gap-2 mb-3 ${getFlashClass(f.key)}`}
+          onContextMenu={e => onFeatureContextMenu(e, f.key)}
+          onDoubleClick={e => onFeatureDoubleClick(e, f.key)}
+        >
           <label className="font-medium mr-2 min-w-fit" htmlFor={`sel-${f.key}`}>{f.label}</label>
           <select
             id={`sel-${f.key}`}
             value={config[f.key] as string || (f.options && f.options[0]?.value) || ""}
-            disabled={!!disabledMap?.[f.key]}
+            disabled={isDisabled}
             onChange={e => setDrop(e, f.key)}
-            onContextMenu={e => { e.preventDefault(); if (enableDependencies) enableDependencies(f.key); }}
-            onDoubleClick={e => { if (disabledMap?.[f.key] && enableDependencies) { e.preventDefault(); enableDependencies(f.key); } }}
             className={selectClass}
           >
             {f.options?.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
@@ -69,17 +71,22 @@ export function ToggleGroup({ groupName, features, config, setConfig, disabledMa
         </div>
       );
     } else {
+      const isDisabled = !!disabledMap?.[f.key];
       return (
-        <label key={f.key} className={`${labelClass} ${getFlashClass(f.key)}`} htmlFor={`chk-${f.key}`}>
+        <label
+          key={f.key}
+          className={`${labelClass} ${getFlashClass(f.key)}`}
+          htmlFor={`chk-${f.key}`}
+          onContextMenu={e => onFeatureContextMenu(e, f.key)}
+          onDoubleClick={e => onFeatureDoubleClick(e, f.key)}
+        >
           <input
             id={`chk-${f.key}`}
             type="checkbox"
             checked={!!config[f.key]}
-            className={`accent-blue-600 ${checkboxSizeClass} ${disabledMap?.[f.key] ? 'cursor-not-allowed' : ''}`}
-            disabled={!!disabledMap?.[f.key]}
+            className={`accent-blue-600 ${checkboxSizeClass} ${isDisabled ? 'cursor-not-allowed' : ''}`}
+            disabled={isDisabled}
             onChange={() => onCheckboxChange(f.key)}
-            onContextMenu={e => onCheckboxContextMenu(e, f.key)}
-            onDoubleClick={e => onCheckboxDoubleClick(e, f.key)}
           />
           <span>{f.label}</span>
           {f.tooltip && (
@@ -93,18 +100,22 @@ export function ToggleGroup({ groupName, features, config, setConfig, disabledMa
   function renderSubOption(f: typeof features[0]) {
     // Suboptions are always checkboxes (for now), rendered smaller and indented
     const flashClass = getFlashClass(f.key);
+    const isDisabled = !!disabledMap?.[f.key];
     return (
       <div key={f.key} className="mb-3">
-        <label className={`${labelClass} pl-8 text-sm opacity-90`} htmlFor={`chk-${f.key}`}>
+        <label
+          className={`${labelClass} pl-8 text-sm opacity-90`}
+          htmlFor={`chk-${f.key}`}
+          onContextMenu={e => onFeatureContextMenu(e, f.key)}
+          onDoubleClick={e => onFeatureDoubleClick(e, f.key)}
+        >
           <input
             id={`chk-${f.key}`}
             type="checkbox"
             checked={!!config[f.key]}
-            className={`accent-blue-600 w-4 h-4 flex-shrink-0 cursor-pointer ${disabledMap?.[f.key] ? 'cursor-not-allowed' : ''}`}
-            disabled={!!disabledMap?.[f.key]}
+            className={`accent-blue-600 w-4 h-4 flex-shrink-0 cursor-pointer ${isDisabled ? 'cursor-not-allowed' : ''}`}
+            disabled={isDisabled}
             onChange={() => onCheckboxChange(f.key)}
-            onContextMenu={e => onCheckboxContextMenu(e, f.key)}
-            onDoubleClick={e => onCheckboxDoubleClick(e, f.key)}
           />
           <span className={flashClass}>{f.label}</span>
           {f.tooltip && (

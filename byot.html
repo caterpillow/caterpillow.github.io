@@ -27,7 +27,7 @@ TODO:
 <!-- Instructions -->
 <div>
     Usage: click on stuff u want, don't click on stuff you don't want. <br>
-    You can right click a disabled checkbox/dropdown to enable all its prerequisites. <br>
+    Disabled controls are missing prerequisites. Double click or right click a disabled checkbox/dropdown label to enable all its prerequisites. <br>
     Half this site is written by ChatGPT so don't judge too harshly. <br>
     If you have any suggestions or find any bugs (highly likely), leave a comment on the blog. <br>
     <br>
@@ -429,7 +429,25 @@ Warnings:
                 disableBanned(event.target.id)
                 handleUpdate()
             });
-            el.addEventListener("contextmenu", (e) => {
+            addDependencyActivation(el);
+        });
+    }
+
+    function addDependencyActivation(el) {
+        const targets = new Set([
+            el,
+            el.closest("label"),
+            document.querySelector(`label[for="${el.id}"]`),
+            el.parentElement
+        ]);
+        targets.forEach(target => {
+            if (!target) return;
+            target.addEventListener("contextmenu", (e) => {
+                e.preventDefault();
+                enableDependencies(el.id);
+            });
+            target.addEventListener("dblclick", (e) => {
+                if (!el.disabled) return;
                 e.preventDefault();
                 enableDependencies(el.id);
             });
@@ -636,9 +654,7 @@ Warnings:
     }
 
     function copyCode() {
-        code = "";
-        if (signature) code += "// generated at caterpillow.github.io/byot\n\n";
-        code += document.getElementById("code_display").textContent;
+        const code = document.getElementById("code_display").textContent;
 
         navigator.clipboard.writeText(code).then(() => {
             displayCopyStatus("Code copied successfully!", "success");
@@ -718,12 +734,12 @@ Warnings:
                 code += `        if (oth.mn${beats_add ? " - add" : ""} <= mx) mn = mx = oth.mn${beats_add ? " - add" : ""};\n` +
                     `        else if (oth.mx${beats_add ? " - add" : ""} >= mn) mn = mx = oth.mx${beats_add ? " - add" : ""};\n` +
                     `        else {\n` +
-                    `            mn = min(mn, oth.mn${beats_add ? " - add" : ""});\n` +
-                    `            mx = max(mx, oth.mx${beats_add ? " - add" : ""});\n` +
+                    `            mn = std::min(mn, oth.mn${beats_add ? " - add" : ""});\n` +
+                    `            mx = std::max(mx, oth.mx${beats_add ? " - add" : ""});\n` +
                     '        }\n'
             } else {
-                if (beats_chmin) code += `        mn = min(mn, oth.mn${beats_add ? " - add" : ""});\n`
-                if (beats_chmax) code += `        mx = max(mx, oth.mx${beats_add ? " - add" : ""});\n`
+                if (beats_chmin) code += `        mn = std::min(mn, oth.mn${beats_add ? " - add" : ""});\n`
+                if (beats_chmax) code += `        mx = std::max(mx, oth.mx${beats_add ? " - add" : ""});\n`
             }
             if (beats_add) code += `        add += oth.add;\n`
 
@@ -820,12 +836,12 @@ Warnings:
                     if (items.length > 0) code += `        if (!lazy.kinc) ${items.join('')}0;\n`
                 }
                 if (key_add || key_set) {
-                    if (key_sum) code += '        ksum += lazy.val * sz;\n'
+                    if (key_sum) code += '        ksum += lazy.kval * sz;\n'
                 }
                 if (beats_chmin && beats_chmax) {
                     code += '        if (mn == mx) {\n' +
-                        '            mn = mx = min(lazy.mn, mn);\n' +
-                        '            mn = mx = max(lazy.mx, mn);\n' +
+                        '            mn = mx = std::min(lazy.mn, mn);\n' +
+                        '            mn = mx = std::max(lazy.mx, mn);\n' +
                         '            sum = mn * mncnt;\n' +
                         '        } else if (mn == mx2) {\n' +
                         '            if (lazy.mx > mn) mn = mx2 = lazy.mx;\n' +
@@ -855,12 +871,12 @@ Warnings:
                 if (range_min) code += "        res.mn = std::min(mn, oth.mn);\n";
                 if (key_sum) code += "        res.ksum = ksum + oth.ksum;\n";
                 if (treap_beats) code += '        res.sum = sum + oth.sum;\n'
-                if (beats_chmin) code += '        if (mx == oth.mx) res.mx = mx, res.mxcnt = mxcnt + oth.mxcnt, res.mx2 = max(mx2, oth.mx2);\n' +
-                    '        else if (mx > oth.mx) res.mx = mx, res.mxcnt = mxcnt, res.mx2 = max(mx2, oth.mx);\n' +
-                    '        else res.mx = oth.mx, res.mxcnt = oth.mxcnt, res.mx2 = max(mx, oth.mx2);\n'
-                if (beats_chmax) code += '        if (mn == oth.mn) res.mn = mn, res.mncnt = mncnt + oth.mncnt, res.mn2 = min(mn2, oth.mn2);\n' +
-                    '        else if (mn < oth.mn) res.mn = mn, res.mncnt = mncnt, res.mn2 = min(mn2, oth.mn);\n' +
-                    '        else res.mn = oth.mn, res.mncnt = oth.mncnt, res.mn2 = min(mn, oth.mn2);\n'
+                if (beats_chmin) code += '        if (mx == oth.mx) res.mx = mx, res.mxcnt = mxcnt + oth.mxcnt, res.mx2 = std::max(mx2, oth.mx2);\n' +
+                    '        else if (mx > oth.mx) res.mx = mx, res.mxcnt = mxcnt, res.mx2 = std::max(mx2, oth.mx);\n' +
+                    '        else res.mx = oth.mx, res.mxcnt = oth.mxcnt, res.mx2 = std::max(mx, oth.mx2);\n'
+                if (beats_chmax) code += '        if (mn == oth.mn) res.mn = mn, res.mncnt = mncnt + oth.mncnt, res.mn2 = std::min(mn2, oth.mn2);\n' +
+                    '        else if (mn < oth.mn) res.mn = mn, res.mncnt = mncnt, res.mn2 = std::min(mn2, oth.mn);\n' +
+                    '        else res.mn = oth.mn, res.mncnt = oth.mncnt, res.mn2 = std::min(mn, oth.mn2);\n'
                 code += "        return res;\n" +
                     "    }\n"
             }
@@ -958,6 +974,10 @@ Warnings:
         if (push) {
             code += "void push(ptr n) {\n"
             if (lazy_prop) {
+                if (key_add || key_set) {
+                    if (key_set) code += '    if (!n->lazy.kinc) n->key = 0;\n'
+                    code += '    n->key += n->lazy.kval;\n'
+                }
                 if (enable_value) code += `    n->val.upd(n->lazy${size_option ? ', 1' : ''});\n`
                 if (range_agg) code += `    n->agg.upd(n->lazy${size_option ? ', sz(n)' : ''});\n`
                 if (range_reverse) code += '    if (n->lazy.rev) std::swap(n->l, n->r);\n'
@@ -1248,7 +1268,7 @@ Warnings:
                 '    while (r) {\n' +
                 '        auto [lt, rt] = split(l, mn(r)->key + 1);\n' +
                 '        res = merge(res, lt);\n' +
-                '        tie(l, r) = make_pair(r, rt);\n' +
+                '        std::tie(l, r) = std::make_pair(r, rt);\n' +
                 '    }\n' +
                 '    return merge(res, l);\n' +
                 '}\n\n'
@@ -1271,7 +1291,7 @@ Warnings:
             if (comments) code += "// you CANNOT use the normal range update for range reverses\n"
             code += `void reverse(ptr& n, ${key_type} lo, ${key_type} hi) {\n`
             code += `    auto [lm, r] = split(n, hi${incexc ? "" : " + 1"});\n` +
-                `    auto [l, m] = split(lm, lo${incexc ? "" : " + 1"});\n` +
+                '    auto [l, m] = split(lm, lo);\n' +
                 '    Lazy upd = lid;\n' +
                 '    upd.rev = true;\n' +
                 '    if (m) m->lazy += upd;\n' +
@@ -1283,7 +1303,7 @@ Warnings:
             if (comments) code += "// you CANNOT use the normal range update for range reverses\n"
             code += 'void reversei(ptr& n, int lo, int hi) {\n'
             code += `    auto [lm, r] = spliti(n, hi${incexc ? "" : " + 1"});\n` +
-                `    auto [l, m] = spliti(lm, lo${incexc ? "" : " + 1"});\n` +
+                '    auto [l, m] = spliti(lm, lo);\n' +
                 '    Lazy upd = lid;\n' +
                 '    upd.rev = true;\n' +
                 '    if (m) m->lazy += upd;\n' +
@@ -1301,20 +1321,26 @@ Warnings:
         }
 
         if (range_update_index) {
-            code += 'void updi(ptr n, int lo, int hi, Lazy lazy) {\n' +
+            const fn = incexc ? 'updi' : 'updi_impl';
+            code += `void ${fn}(ptr n, int lo, int hi, Lazy lazy) {\n` +
                 '    if (!n) return;\n'
             if (push) code += '    push(n);\n'
-            code += `    if (lo >= n->sz || hi <${incexc ? '=' : ''} 0${treap_beats ? " || n->agg.can_break(lazy)" : ""}) return;\n` +
-                `    if (lo <= 0 && n->sz${incexc ? '' : ' - 1'} <= hi${treap_beats ? " && n->agg.can_tag(lazy)" : ""}) {\n` +
+            code += `    if (lo >= n->sz || hi <= 0${treap_beats ? " || n->agg.can_break(lazy)" : ""}) return;\n` +
+                `    if (lo <= 0 && n->sz <= hi${treap_beats ? " && n->agg.can_tag(lazy)" : ""}) {\n` +
                 '        n->lazy += lazy;\n'
             if (push) code += '        push(n);\n'
             code += '        return;\n' +
                 '    }\n' +
-                `    if (lo <= sz(n->l) && sz(n->l) <${incexc ? '' : '='} hi) n->val.upd(lazy${size_option ? ', 1' : ''});\n` +
-                '    updi(n->l, lo, hi, lazy);\n' +
-                '    updi(n->r, lo - 1 - sz(n->l), hi - 1 - sz(n->l), lazy);\n' +
+                `    if (lo <= sz(n->l) && sz(n->l) < hi) n->val.upd(lazy${size_option ? ', 1' : ''});\n` +
+                `    ${fn}(n->l, lo, hi, lazy);\n` +
+                `    ${fn}(n->r, lo - 1 - sz(n->l), hi - 1 - sz(n->l), lazy);\n` +
                 '    pull(n);\n' +
                 '}\n\n'
+            if (!incexc) {
+                code += 'void updi(ptr n, int lo, int hi, Lazy lazy) {\n' +
+                    '    updi_impl(n, lo, hi + 1, lazy);\n' +
+                    '}\n\n'
+            }
         }
 
         if (range_update_key && treap_beats) {
@@ -1337,12 +1363,18 @@ Warnings:
         }
 
         if (range_query_index) {
-            code += 'Value queryi(ptr n, int lo, int hi) {\n' +
-                `    if (!n || lo >= sz(n) || hi <${incexc ? '=' : ''} 0) return vid;\n`
+            const fn = incexc ? 'queryi' : 'queryi_impl';
+            code += `Value ${fn}(ptr n, int lo, int hi) {\n` +
+                '    if (!n || lo >= sz(n) || hi <= 0) return vid;\n'
             if (push) code += '    push(n);\n'
-            code += `    if (lo <= 0 && sz(n)${incexc ? '' : ' - 1'} <= hi) return n->agg;\n` +
-                `    return queryi(n->l, lo, hi) + (lo <= sz(n->l) && sz(n->l) <${incexc ? '' : '='} hi ? n->val : vid) + queryi(n->r, lo - 1 - sz(n->l), hi - 1 - sz(n->l));\n` +
+            code += '    if (lo <= 0 && sz(n) <= hi) return n->agg;\n' +
+                `    return ${fn}(n->l, lo, hi) + (lo <= sz(n->l) && sz(n->l) < hi ? n->val : vid) + ${fn}(n->r, lo - 1 - sz(n->l), hi - 1 - sz(n->l));\n` +
                 '}\n\n'
+            if (!incexc) {
+                code += 'Value queryi(ptr n, int lo, int hi) {\n' +
+                    '    return queryi_impl(n, lo, hi + 1);\n' +
+                    '}\n\n'
+            }
         }
 
         if (clean_option) {
@@ -1421,11 +1453,12 @@ Warnings:
             code = prefix + code
             if (template) {
                 code += '\n\nmain() {\n' +
-                    '    cin.tie(0)->sync_with_stdio(0);\n' +
+                    `    ${use_namespace_std ? '' : 'std::'}cin.tie(0)->sync_with_stdio(0);\n` +
                     '    \n' +
-                    '}\n'
+                '}\n'
             }
         }
+        if (signature) code = "// generated at caterpillow.github.io/byot\n\n" + code;
 
         const tab_character = getTabCharacter();
         code = code.replace(/ {4}/g, tab_character);
