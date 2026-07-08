@@ -5,7 +5,7 @@ interface ToggleGroupProps {
   groupName: string;
   features: FeatureMeta[];
   config: Record<string, boolean|string>;
-  setConfig: (c: Record<string, boolean|string>) => void;
+  setConfig: (c: Record<string, boolean|string>, key?: string) => void;
   disabledMap?: Record<string, boolean>;
   enableDependencies?: (id: string) => void;
   flashStates?: Record<string, 'enabled' | 'disabled' | null>;
@@ -13,7 +13,7 @@ interface ToggleGroupProps {
 
 export function ToggleGroup({ groupName, features, config, setConfig, disabledMap, enableDependencies, flashStates }: ToggleGroupProps) {
   function onCheckboxChange(k: string) {
-    setConfig({ ...config, [k]: !config[k] });
+    setConfig({ ...config, [k]: !config[k] }, k);
   }
   function onFeatureContextMenu(e: React.MouseEvent, k: string) {
     e.preventDefault();
@@ -27,7 +27,7 @@ export function ToggleGroup({ groupName, features, config, setConfig, disabledMa
   }
   function setDrop(e: React.ChangeEvent<HTMLSelectElement>, k: string) {
     if (disabledMap?.[k]) return;
-    setConfig({ ...config, [k]: e.target.value });
+    setConfig({ ...config, [k]: e.target.value }, k);
   }
   // Standardized but refined sizing (not too giant)
   const checkboxSizeClass = "w-5 h-5 flex-shrink-0 cursor-pointer";

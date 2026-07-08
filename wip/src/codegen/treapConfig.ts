@@ -343,7 +343,8 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
 
     out += "};\n\n";
     if (cfg.array_storage) {
-      out += `Node nodes[${arrayStorageSize(cfg)}];\n`;
+      out += `const int NODE_CAP = ${arrayStorageSize(cfg)};\n`;
+      out += 'Node nodes[NODE_CAP];\n';
       out += 'int node_cnt = 0;\n\n';
       out += 'ptr::ptr(Node *n) : p(n ? int(n - nodes) : 0) {}\n';
       out += 'ptr &ptr::operator=(Node *n) { p = n ? int(n - nodes) : 0; return *this; }\n';
@@ -352,7 +353,14 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
       out += 'Node *ptr::get() const { return p ? &nodes[p] : nullptr; }\n';
       out += 'ptr::operator Node*() const { return get(); }\n\n';
       out += 'void *Node::operator new(std::size_t) {\n';
-      out += `    assert(node_cnt + 1 < ${arrayStorageSize(cfg)});\n`;
+      out += '    if (node_cnt + 1 >= NODE_CAP) {\n';
+      out += '        std::vector<char*> waste;\n';
+      out += '        while (true) {\n';
+      out += '            char *p = new char[1 << 26];\n';
+      out += '            std::memset(p, 0, 1 << 26);\n';
+      out += '            waste.push_back(p);\n';
+      out += '        }\n';
+      out += '    }\n';
       out += '    return &nodes[++node_cnt];\n';
       out += '}\n\n';
     }
@@ -1239,6 +1247,10 @@ const ORDER = [
 
 export function generateTreapCode(cfg: TreapConfig): string {
   cfg = { ...cfg };
+  if (cfg.array_storage) {
+    cfg.augmented_ptr = true;
+    cfg.min_option = true;
+  }
   if (cfg.persistent) {
     cfg.size_biased_merge = true;
     cfg.merge_option = true;

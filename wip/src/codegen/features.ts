@@ -172,6 +172,7 @@ export const edges: Array<[string, string]> = [
   ["range_min", "val_type"],
   ["key_sum", "range_agg"],
   ["range_agg", "val_type"],
+  ["array_storage", "augmented_ptr"],
   ["plus_merge_option", "merge_option"],
   ["plus_merge_option", "augmented_ptr"],
   ["safe_merge_plus", "plus_merge_option"],
@@ -224,6 +225,11 @@ export const edges: Array<[string, string]> = [
   // New dependencies for iterator helpers
   ["succ", "par_option"],
   ["pred", "par_option"],
+];
+
+export const preferences: Array<[string, string]> = [
+  ["augmented_ptr", "plus_merge_option"],
+  ["persistent", "array_storage"],
 ];
 
 // Mutual exclusions

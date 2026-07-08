@@ -29,6 +29,7 @@ await esbuild.build({
   logLevel: "silent",
 });
 const { generateTreapCode } = require(generatorBundle);
+assertGeneratorInvariants(generateTreapCode);
 
 const compileCases = buildCompileCases();
 const stressCases = buildStressCases();
@@ -99,6 +100,10 @@ function derive(cfg) {
     augmented_ptr: Boolean(cfg.augmented_ptr || cfg.array_storage),
     push: Boolean(cfg.lazy_prop),
   };
+  if (out.array_storage) {
+    out.augmented_ptr = true;
+    out.min_option = true;
+  }
   if (out.persistent) {
     out.size_biased_merge = true;
     out.merge_option = true;
@@ -122,6 +127,31 @@ function baseCppConfig(overrides = {}) {
     val_type: "none",
     ...overrides,
   });
+}
+
+function assertGeneratorInvariants(generate) {
+  const code = generate({
+    signature: false,
+    comments: false,
+    template: false,
+    use_namespace_std: false,
+    use_ll_typedef: false,
+    namespace_treap: false,
+    tab_char: "4spaces",
+    range_type: "inc exc",
+    key_type: "int",
+    val_type: "none",
+    array_storage: true,
+  });
+  if (!code.includes("ptr mn(ptr n)")) {
+    throw new Error("array storage must force augmented ptr dependencies, including mn()");
+  }
+  if (!code.includes("const int NODE_CAP = 1 << 17;") || !code.includes("Node nodes[NODE_CAP];")) {
+    throw new Error("array storage must emit and use NODE_CAP");
+  }
+  if (code.includes("assert(node_cnt")) {
+    throw new Error("array storage overflow should force memory exhaustion instead of asserting");
+  }
 }
 
 function buildCompileCases() {

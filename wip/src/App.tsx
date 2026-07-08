@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { features, edges } from "./codegen/features";
+import { features, edges, preferences } from "./codegen/features";
 import { computeDisabled } from "./codegen/depsUtil";
 import { ToggleGroup } from "./components/ToggleGroup";
 import { generateTreapCode } from "./codegen/treapConfig";
@@ -23,14 +23,43 @@ function defaultConfig() {
   return cfg;
 }
 
-function derive(cfg: Record<string, any>) {
-  if (cfg.array_storage) cfg.augmented_ptr = true;
-  if (cfg.persistent) {
-    cfg.size_biased_merge = true;
-    cfg.merge_option = true;
-    cfg.size_option = true;
+function isEnabled(cfg: Record<string, any>, key: string) {
+  const f = features.find(f => f.key === key);
+  if (f?.type === "select") {
+    const defaultVal = f.options?.[0]?.value;
+    return !!cfg[key] && cfg[key] !== defaultVal;
   }
-  if (cfg.size_biased_merge) cfg.size_option = true;
+  return !!cfg[key];
+}
+
+function resetFeature(cfg: Record<string, any>, key: string) {
+  const f = features.find(f => f.key === key);
+  if (!f) return;
+  cfg[key] = f.type === "select" ? f.options?.[0]?.value || "" : false;
+}
+
+function enableFeature(cfg: Record<string, any>, key: string) {
+  const f = features.find(f => f.key === key);
+  if (!f) return;
+  cfg[key] = f.type === "select" ? f.options?.[1]?.value || f.options?.[0]?.value || "" : true;
+}
+
+function pruneDependencies(cfg: Record<string, any>) {
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const [id, dep] of edges) {
+      if (isEnabled(cfg, id) && !isEnabled(cfg, dep)) {
+        resetFeature(cfg, id);
+        changed = true;
+      }
+    }
+  }
+}
+
+function derive(cfg: Record<string, any>) {
+  cfg = { ...cfg };
+  pruneDependencies(cfg);
   cfg.pull = !!(cfg.size_option || cfg.range_agg || cfg.par_option);
   cfg.push = !!cfg.lazy_prop;
   return cfg;
@@ -66,6 +95,27 @@ export default function App() {
   const prereqs = prereqMap();
   const columns = splitSectionsIntoColumns(SECTIONS);
 
+  function enableWithDependencies(cfg: Record<string, any>, key: string, visited = new Set<string>()) {
+    if (visited.has(key)) return;
+    visited.add(key);
+    (prereqs[key] || []).forEach(prereq => {
+      enableWithDependencies(cfg, prereq, visited);
+      enableFeature(cfg, prereq);
+    });
+    enableFeature(cfg, key);
+  }
+
+  function commitConfig(next: Record<string, any>, sourceKey?: string) {
+    let newConfig = derive(next);
+    if (sourceKey && !isEnabled(config, sourceKey) && isEnabled(newConfig, sourceKey)) {
+      preferences
+        .filter(([from]) => from === sourceKey)
+        .forEach(([, to]) => enableWithDependencies(newConfig, to));
+      newConfig = derive(newConfig);
+    }
+    setConfig(newConfig);
+  }
+
   // Reset disabled selects and checkboxes to default values immediately when they get disabled
   useEffect(() => {
     let needsReset = false;
@@ -87,7 +137,7 @@ export default function App() {
         }
       }
     });
-    if (needsReset) setConfig(derive(newConfig));
+    if (needsReset) commitConfig(newConfig);
     // eslint-disable-next-line
   }, [disabled]);
 
@@ -204,39 +254,9 @@ export default function App() {
   }, [config]);
 
   function enableDependencies(key: string) {
-    let newConfig = { ...config };
-    // Recursively walk prereqs upstream
-    function dfsEnable(feature: string, visited = new Set<string>()) {
-      if (visited.has(feature)) return;
-      visited.add(feature);
-      // Enable all this feature's own prerequisites
-      (prereqs[feature] || []).forEach(prereq => {
-        // Enable prerequisite itself (handle select vs checkbox)
-        const f = features.find(f => f.key === prereq);
-        if (f) {
-          if (f.type === "select") {
-            // Pick first non-default value if not set
-            if (!newConfig[prereq] || newConfig[prereq] === f.options?.[0]?.value) {
-              newConfig[prereq] = f.options?.[1]?.value || f.options?.[0]?.value;
-            }
-          } else {
-            newConfig[prereq] = true;
-          }
-        }
-        dfsEnable(prereq, visited);
-      });
-    }
-    dfsEnable(key);
-    // Now enable the originally-clicked feature
-    const f = features.find(f => f.key === key);
-    if (f) {
-      if (f.type === "select") {
-        newConfig[key] = f.options?.[1]?.value || f.options?.[0]?.value;
-      } else {
-        newConfig[key] = true;
-      }
-    }
-    setConfig(derive(newConfig));
+    const newConfig = { ...config };
+    enableWithDependencies(newConfig, key);
+    commitConfig(newConfig, key);
   }
 
   function copyCode() {
@@ -270,7 +290,7 @@ export default function App() {
                   groupName={section}
                   features={features.filter(f => f.section === section)}
                   config={config}
-                  setConfig={c => setConfig(derive({ ...c }))}
+                  setConfig={(c, key) => commitConfig({ ...c }, key)}
                   disabledMap={disabled}
                   enableDependencies={enableDependencies}
                   flashStates={flashStates}
