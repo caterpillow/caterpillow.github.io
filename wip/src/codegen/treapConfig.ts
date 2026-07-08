@@ -3,6 +3,14 @@ import { features } from './features';
 
 export type TreapConfig = Record<string, boolean|string>;
 
+function usesAugmentedPtr(cfg: TreapConfig) {
+  return !!(cfg.augmented_ptr || cfg.array_storage);
+}
+
+function arrayStorageSize(cfg: TreapConfig) {
+  return String(cfg.array_storage_size || '1 << 17');
+}
+
 // Small helper utilities for conditional code wrapping
 function helpers(cfg: TreapConfig) {
   return {
@@ -18,22 +26,23 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
 
   // Forward declarations for iterator helpers
   forwardDecls: (cfg) => {
+    const augmentedPtr = usesAugmentedPtr(cfg);
     const decls: string[] = [];
     decls.push('struct Node;');
     if (cfg.enable_value && cfg.lazy_prop) decls.push('struct Lazy;');
-    if (!cfg.augmented_ptr) decls.push('using ptr = struct Node *;');
+    if (!augmentedPtr) decls.push('using ptr = struct Node *;');
     else decls.push('struct ptr;')
     if (cfg.succ) decls.push('ptr succ(ptr n);');
     if (cfg.pred) decls.push('ptr pred(ptr n);');
     if (cfg.merge_option) decls.push('ptr merge(ptr l, ptr r);');
-    if (cfg.augmented_ptr || cfg.mn_option) decls.push('ptr mn(ptr n);');
+    if (augmentedPtr || cfg.mn_option) decls.push('ptr mn(ptr n);');
     if (decls.length == 0) return '';
     return decls.join(' ') + '\n\n';
   },
 
   // ptr type: augmented wrapper or plain alias
   ptrType: (cfg) => {
-    if (cfg.augmented_ptr) {
+    if (usesAugmentedPtr(cfg)) {
       let s = '';
       s += 'struct ptr {\n';
       if (cfg.succ || cfg.pred) {
@@ -47,12 +56,34 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
         s += '#endif\n';
         s += '\n\n';
       }
-      s += '    Node *p;\n';
-      s += '    ptr(Node *p = nullptr) : p(p) {}\n\n';
+      if (cfg.array_storage) {
+        s += '    int p;\n';
+        s += '    ptr(std::nullptr_t = nullptr) : p(0) {}\n';
+        s += '    ptr(int p) : p(p) {}\n';
+        s += '    ptr(Node *p);\n\n';
+      } else {
+        s += '    Node *p;\n';
+        s += '    ptr(std::nullptr_t = nullptr) : p(nullptr) {}\n';
+        s += '    ptr(Node *p) : p(p) {}\n\n';
+      }
+      s += `    ptr &operator=(std::nullptr_t) { p = ${cfg.array_storage ? '0' : 'nullptr'}; return *this; }\n`;
+      if (cfg.array_storage) s += '    ptr &operator=(Node *n);\n';
+      else s += '    ptr &operator=(Node *n) { p = n; return *this; }\n';
+      s += `    bool operator==(std::nullptr_t) const noexcept { return p == ${cfg.array_storage ? '0' : 'nullptr'}; }\n`;
+      s += `    bool operator!=(std::nullptr_t) const noexcept { return p != ${cfg.array_storage ? '0' : 'nullptr'}; }\n\n`;
       s += '    template <class... Args>\n';
       s += '    static ptr make(Args&&... args);\n\n';
-      s += '    Node &operator*() const { return *p; }\n';
-      s += '    Node *operator->() const { return p; }\n';
+      if (cfg.array_storage) {
+        s += '    Node &operator*() const;\n';
+        s += '    Node *operator->() const;\n';
+        s += '    Node *get() const;\n';
+        s += '    operator Node*() const;\n';
+      } else {
+        s += '    Node &operator*() const { return *p; }\n';
+        s += '    Node *operator->() const { return p; }\n';
+        s += '    Node *get() const { return p; }\n';
+        s += '    operator Node*() const { return p; }\n';
+      }
       s += '    explicit operator bool() const noexcept { return p; }\n';
       s += '    bool operator==(const ptr &o) const noexcept { return p == o.p; }\n';
       s += '    bool operator!=(const ptr &o) const noexcept { return p != o.p; }\n';
@@ -67,11 +98,11 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
       }
       if (cfg.plus_merge_option) {
         s += '\n';
-        s += `    friend ptr operator+(ptr &lhs, ptr &rhs) { ptr res = merge(lhs, rhs); ${cfg.safe_merge_plus ? "lhs.p = rhs.p = nullptr; " : ""}return res; }\n`;
-        s += `    friend ptr operator+(ptr &lhs, ptr &&rhs) { ptr res = merge(lhs, rhs); ${cfg.safe_merge_plus ? "lhs.p = nullptr; " : ""}return res; }\n`;
-        s += `    friend ptr operator+(ptr &&lhs, ptr &rhs) { ptr res = merge(lhs, rhs); ${cfg.safe_merge_plus ? "rhs.p = nullptr; " : ""}return res; }\n`;
+        s += `    friend ptr operator+(ptr &lhs, ptr &rhs) { ptr res = merge(lhs, rhs); ${cfg.safe_merge_plus ? "lhs = rhs = nullptr; " : ""}return res; }\n`;
+        s += `    friend ptr operator+(ptr &lhs, ptr &&rhs) { ptr res = merge(lhs, rhs); ${cfg.safe_merge_plus ? "lhs = nullptr; " : ""}return res; }\n`;
+        s += `    friend ptr operator+(ptr &&lhs, ptr &rhs) { ptr res = merge(lhs, rhs); ${cfg.safe_merge_plus ? "rhs = nullptr; " : ""}return res; }\n`;
         s += `    friend ptr operator+(ptr &&lhs, ptr &&rhs) { return merge(lhs, rhs); }\n`;
-        s += `    friend ptr &operator+=(ptr &lhs, ptr &rhs) { lhs = merge(lhs, rhs); ${cfg.safe_merge_plus ? "rhs.p = nullptr; " : ""}return lhs; }\n`;
+        s += `    friend ptr &operator+=(ptr &lhs, ptr &rhs) { lhs = merge(lhs, rhs); ${cfg.safe_merge_plus ? "rhs = nullptr; " : ""}return lhs; }\n`;
         s += `    friend ptr &operator+=(ptr &lhs, ptr &&rhs) { return lhs = merge(lhs, rhs); }\n`;
       }
       s += '\n';
@@ -134,7 +165,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
       out += `        return ${breakArgs.join(' && ')};\n`;
       out += '    }\n\n';
       out += '    bool can_tag(const Lazy& lazy) {\n';
-      out += `        return ${tagArgs.join(' && ')};\n`;
+      out += `        return ${tagArgs.length ? tagArgs.join(' && ') : 'true'};\n`;
       out += '    }\n\n';
     }
     if (cfg.lazy_prop) {
@@ -226,6 +257,10 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     let out = '';
     out += 'std::mt19937 mt(std::chrono::high_resolution_clock::now().time_since_epoch().count());\n\n';
     out += "struct Node {\n";
+    if (cfg.array_storage) {
+      out += '    static void *operator new(std::size_t);\n';
+      out += '    static void operator delete(void*) {}\n\n';
+    }
     // Value lines (preserve order; combine when same type)
     {
       const valueFields: string[] = [];
@@ -252,15 +287,19 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     const hasKey = cfg.key_type && cfg.key_type !== 'none';
     const hasVal = !!cfg.enable_value;
 
+    if (cfg.array_storage) {
+      out += '    Node() = default;\n';
+    }
+
     if (hasKey || hasVal) {
       const params: string[] = [];
       const inits: string[] = [];
       if (hasKey) {
-        params.push(`${cfg.key_type} key = {}`);
+        params.push(`${cfg.key_type} key${cfg.array_storage ? '' : ' = {}'}`);
         inits.push('key(key)');
       }
       if (hasVal) {
-        params.push('Value val = vid');
+        params.push(`Value val${cfg.array_storage ? '' : ' = vid'}`);
         inits.push('val(val)');
       }
       if (cfg.range_agg) inits.push('agg(val)');
@@ -274,7 +313,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
       if (cfg.par_option) out += '        par = nullptr;\n';
       if (cfg.key_sum) out += '        val.ksum = agg.ksum = 0;\n';
       out += '    }\n';
-    } else {
+    } else if (!cfg.array_storage) {
       // No key and no value: simple default constructor (cannot delegate)
       out += '    Node() {\n';
       out += '        pri = mt();\n';
@@ -285,13 +324,31 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
       out += '    }\n';
     }
 
-    out += "\n    ~Node() {\n";
-    out += `        delete l${cfg.augmented_ptr ? ".p" : ""};\n`;
-    out += `        delete r${cfg.augmented_ptr ? ".p" : ""};\n`;
-    out += "    }\n";
+    if (cfg.array_storage) {
+      out += "\n    ~Node() {}\n";
+    } else {
+      out += "\n    ~Node() {\n";
+      out += `        delete l${usesAugmentedPtr(cfg) ? ".p" : ""};\n`;
+      out += `        delete r${usesAugmentedPtr(cfg) ? ".p" : ""};\n`;
+      out += "    }\n";
+    }
 
     out += "};\n\n";
-    if (cfg.augmented_ptr) {
+    if (cfg.array_storage) {
+      out += `Node nodes[${arrayStorageSize(cfg)}];\n`;
+      out += 'int node_cnt = 0;\n\n';
+      out += 'ptr::ptr(Node *n) : p(n ? int(n - nodes) : 0) {}\n';
+      out += 'ptr &ptr::operator=(Node *n) { p = n ? int(n - nodes) : 0; return *this; }\n';
+      out += 'Node &ptr::operator*() const { return nodes[p]; }\n';
+      out += 'Node *ptr::operator->() const { return p ? &nodes[p] : nullptr; }\n';
+      out += 'Node *ptr::get() const { return p ? &nodes[p] : nullptr; }\n';
+      out += 'ptr::operator Node*() const { return get(); }\n\n';
+      out += 'void *Node::operator new(std::size_t) {\n';
+      out += `    assert(node_cnt + 1 < ${arrayStorageSize(cfg)});\n`;
+      out += '    return &nodes[++node_cnt];\n';
+      out += '}\n\n';
+    }
+    if (usesAugmentedPtr(cfg)) {
       out += 'template <class... Args>\n';
       out += 'ptr ptr::make(Args&&... args) {\n';
       out += '    return ptr(new Node(std::forward<Args>(args)...));\n';
@@ -919,6 +976,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
           s += '    } else {\n';
           s += '        if (lazy.mn < mx) sum -= (mx - lazy.mn) * mxcnt, mx = lazy.mn;\n';
           s += '        if (lazy.mx > mn) sum += (lazy.mx - mn) * mncnt, mn = lazy.mx;\n';
+          s += '    }\n';
         } else {
           if (cfg.beats_chmin) s += '    if (lazy.mn < mx) sum -= (mx - lazy.mn) * mxcnt, mx = lazy.mn;\n';
           if (cfg.beats_chmax) s += '    if (lazy.mx > mn) sum += (lazy.mx - mn) * mncnt, mn = lazy.mx;\n';
@@ -1024,14 +1082,14 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
 const ORDER = [
   'intro', 'comment',
   'forwardDecls', 'ptrType',
-  'valueStruct', 'lazyStruct', 'beatsTagHelpers',
-  'vidConst', 'lidConst',
+  'lazyStruct', 'valueStruct',
+  'vidConst', 'lidConst', 'beatsTagHelpers',
   'nodeStruct',
   'valueUpd',
   'szFn', 'aggFn',
   'pushFn', 'pullFn', 'mergeFn', 'safeMergeFn', 'nMergeFn', 'splitFn',
-  'threeSplit', 'findFn', 'findiFn', 'insFn', 'delFn', 'delAllFn', 'insiFn', 'deliFn', 'minFn', 'maxFn',
-  'threeSplitIndex','splitiFn','modFn','modIndexFn', 'rotateFn',
+  'threeSplit', 'splitiFn', 'threeSplitIndex', 'findFn', 'findiFn', 'insFn', 'delFn', 'delAllFn', 'insiFn', 'deliFn', 'minFn', 'maxFn',
+  'modFn','modIndexFn', 'rotateFn',
   'succFn','predFn', 'cleanFn', 'orderFn', 'rootFn',
   'lowerBound', 'upperBound', 'partitionKey','partitionIndex','cumulativePartitionKey','cumulativePartitionIndex',
   'uniteFn','uniteFastFn','heapifyFn','buildFn','tourFn',

@@ -6,7 +6,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "build:page": "npm run build && node build-page.js"
+    "build:page": "npm run build && node build-page.js",
+    "test:byot": "node tools/byot-test.mjs"
   },
   "dependencies": {
     "react": "^18.0.0",

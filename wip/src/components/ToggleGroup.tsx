@@ -98,9 +98,29 @@ export function ToggleGroup({ groupName, features, config, setConfig, disabledMa
   }
 
   function renderSubOption(f: typeof features[0]) {
-    // Suboptions are always checkboxes (for now), rendered smaller and indented
     const flashClass = getFlashClass(f.key);
     const isDisabled = !!disabledMap?.[f.key];
+    if (f.type === "select") {
+      return (
+        <div
+          key={f.key}
+          className={`mb-3 flex items-center gap-2 pl-8 text-sm opacity-90 ${flashClass}`}
+          onContextMenu={e => onFeatureContextMenu(e, f.key)}
+          onDoubleClick={e => onFeatureDoubleClick(e, f.key)}
+        >
+          <label className="font-medium mr-2 min-w-fit" htmlFor={`sel-${f.key}`}>{f.label}</label>
+          <select
+            id={`sel-${f.key}`}
+            value={config[f.key] as string || (f.options && f.options[0]?.value) || ""}
+            disabled={isDisabled}
+            onChange={e => setDrop(e, f.key)}
+            className="border rounded px-2 py-1 min-w-[6rem] text-sm leading-5 flex-shrink-0 cursor-pointer"
+          >
+            {f.options?.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
+          </select>
+        </div>
+      );
+    }
     return (
       <div key={f.key} className="mb-3">
         <label

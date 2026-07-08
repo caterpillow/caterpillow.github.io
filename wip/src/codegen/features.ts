@@ -34,6 +34,17 @@ export const features: FeatureMeta[] = [
   ] },
   // Pointer / Iterators
   { key: "augmented_ptr", label: "Augmented pointer (iterable ptr)", section: "Pointer/Iterators"},
+  { key: "array_storage", label: "Array storage", section: "Pointer/Iterators", tooltip: "Store nodes in one static array and represent augmented ptr as an index." },
+  { key: "array_storage_size", label: "Node array size", section: "Pointer/Iterators", type: "select", subOptionOf: "array_storage", options: [
+    { value: "1 << 17", label: "2^17" },
+    { value: "1 << 18", label: "2^18" },
+    { value: "1 << 19", label: "2^19" },
+    { value: "1 << 20", label: "2^20" },
+    { value: "1 << 21", label: "2^21" },
+    { value: "1 << 22", label: "2^22" },
+    { value: "1 << 23", label: "2^23" },
+    { value: "1 << 24", label: "2^24" },
+  ] },
   { key: "succ", label: "Enable succ (successor)", section: "Pointer/Iterators" },
   { key: "pred", label: "Enable pred (predecessor)", section: "Pointer/Iterators" },
   // Merge options
