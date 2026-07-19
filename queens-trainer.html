@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Queens Trainer</title>
 <style>
   :root {
@@ -25,7 +25,7 @@
     --board-line: #14171A;
     --shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; touch-action: manipulation; }
   html { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; }
   body {
@@ -1029,6 +1029,9 @@ document.getElementById('reset-stats').onclick = () => {
     renderStats();
   };
 };
+
+// Prevent mobile browsers from treating a quick second tap as a zoom gesture.
+document.addEventListener('dblclick', event => event.preventDefault(), { passive: false });
 
 route();
 </script>
