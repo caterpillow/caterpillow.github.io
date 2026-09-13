@@ -15,7 +15,7 @@ export const features: FeatureMeta[] = [
   { key: "signature", label: "Include site tag (pls)", section: "Misc" },
   { key: "comments", label: "Include comments", section: "Misc" },
   { key: "template", label: "Include template (for testing)", section: "Misc" },
-  { key: "persistent", label: "Persistent treap", section: "Misc", tooltip: "Keeps old versions valid by cloning before mutation. Requires randomized size merge; array storage is recommended for faster persistent allocation." },
+  { key: "persistent", label: "Persistent treap", section: "Misc", tooltip: "Keeps old versions valid by cloning before mutation. Requires randomized size merge and excludes parent pointers/iterators because shared nodes cannot have version-specific parents. Array storage is recommended for faster persistent allocation." },
   // Namespaces & Typedefs
   { key: "use_namespace_std", label: "Use namespace std", section: "Namespaces & Typedefs" },
   { key: "use_ll_typedef", label: "Use ll = long long", section: "Namespaces & Typedefs" },
@@ -34,7 +34,7 @@ export const features: FeatureMeta[] = [
     { value: "inc inc", label: "inc inc" },
   ] },
   // Pointer / Iterators
-  { key: "augmented_ptr", label: "Augmented pointer (iterable ptr)", section: "Pointer/Iterators"},
+  { key: "augmented_ptr", label: "Augmented pointer (iterable ptr)", section: "Pointer/Iterators", tooltip: "Enable succ for forward range iteration and std::next. Predecessor traversal starts at mx(root), not end(); a null end pointer cannot remember a tree." },
   { key: "array_storage", label: "Array storage", section: "Pointer/Iterators", tooltip: "Store nodes in one static array and represent augmented ptr as an index." },
   { key: "array_storage_size", label: "Node array size", section: "Pointer/Iterators", type: "select", subOptionOf: "array_storage", options: [
     { value: "1 << 17", label: "2^17" },
@@ -81,9 +81,9 @@ export const features: FeatureMeta[] = [
   // Partition options
   { key: "lower_bound_option", label: "Lower bound (key)", section: "Partition" },
   { key: "upper_bound_option", label: "Upper bound (key)", section: "Partition" },
-  { key: "partition_key", label: "Find partition key", section: "Partition" },
+  { key: "partition_key", label: "Find partition key", section: "Partition", tooltip: "Returns an optional key: the first node where a monotone predicate is false, or nullopt if there is no match." },
   { key: "partition_index", label: "Find partition index", section: "Partition" },
-  { key: "cumulative_partition_key", label: "Find cumulative partition key", section: "Partition" },
+  { key: "cumulative_partition_key", label: "Find cumulative partition key", section: "Partition", tooltip: "Returns an optional key for the first prefix aggregate where a monotone predicate is false, or nullopt if there is no match." },
   { key: "cumulative_partition_index", label: "Find cumulative partition index", section: "Partition" },
   // Misc node ops
   { key: "max_option", label: "Include max", section: "Misc Ops" },
@@ -193,6 +193,7 @@ export const edges: Array<[string, string]> = [
   ["range_reverse_key", "split_option"],
   ["range_reverse_index", "spliti_option"],
   ["del_option", "merge_option"],
+  ["del_option", "key_type"],
   ["del_all_option", "split_option"],
   ["del_all_option", "merge_option"],
   ["del_all_option", "key_type"],
@@ -235,6 +236,9 @@ export const preferences: Array<[string, string]> = [
 // Mutual exclusions
 export const mutualExclusions: Array<[string, string]> = [
   ["persistent", "treap_beats"],
+  ["persistent", "par_option"],
+  ["treap_beats", "range_add"],
+  ["treap_beats", "range_set"],
   ["treap_beats", "range_sum"],
   ["treap_beats", "range_min"],
   ["treap_beats", "range_max"],

@@ -1,83 +1,16 @@
 import React, { useState, useEffect, useRef } from "react";
-import { features, edges, preferences } from "./codegen/features";
-import { computeDisabled } from "./codegen/depsUtil";
+import { features, preferences } from "./codegen/features";
+import { computeDisabled, createDefaultConfig as defaultConfig, deriveConfig as derive, enableWithDependencies, isEnabled } from "./codegen/depsUtil";
 import { ToggleGroup } from "./components/ToggleGroup";
-import { generateTreapCode } from "./codegen/treapConfig";
+import { generateTreapCode, type TreapConfig } from "./codegen/treapConfig";
 import { TODO_TEXT } from "./TODO";
 
 // Sections (group the toggles by these)
 const SECTIONS = Array.from(new Set(features.map(f => f.section)));
 
-function defaultConfig() {
-  const cfg: Record<string, any> = {};
-  for (const f of features) {
-    if (f.type === "select") cfg[f.key] = f.options?.[0]?.value || "";
-    else cfg[f.key] = false;
-  }
-  // Override defaults for specific settings
-  cfg.use_namespace_std = true;
-  cfg.tab_char = "4spaces";
-  // derived
-  cfg.pull = false;
-  cfg.push = false;
-  return cfg;
-}
-
-function isEnabled(cfg: Record<string, any>, key: string) {
-  const f = features.find(f => f.key === key);
-  if (f?.type === "select") {
-    const defaultVal = f.options?.[0]?.value;
-    return !!cfg[key] && cfg[key] !== defaultVal;
-  }
-  return !!cfg[key];
-}
-
-function resetFeature(cfg: Record<string, any>, key: string) {
-  const f = features.find(f => f.key === key);
-  if (!f) return;
-  cfg[key] = f.type === "select" ? f.options?.[0]?.value || "" : false;
-}
-
-function enableFeature(cfg: Record<string, any>, key: string) {
-  const f = features.find(f => f.key === key);
-  if (!f) return;
-  cfg[key] = f.type === "select" ? f.options?.[1]?.value || f.options?.[0]?.value || "" : true;
-}
-
-function pruneDependencies(cfg: Record<string, any>) {
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const [id, dep] of edges) {
-      if (isEnabled(cfg, id) && !isEnabled(cfg, dep)) {
-        resetFeature(cfg, id);
-        changed = true;
-      }
-    }
-  }
-}
-
-function derive(cfg: Record<string, any>) {
-  cfg = { ...cfg };
-  pruneDependencies(cfg);
-  cfg.pull = !!(cfg.size_option || cfg.range_agg || cfg.par_option);
-  cfg.push = !!cfg.lazy_prop;
-  return cfg;
-}
-
-// Inverted dependency map: for every id gives a list of prerequisites (i.e. what you must enable to enable this)
-function prereqMap() {
-  const map: Record<string, string[]> = {};
-  edges.forEach(([id, prereq]) => {
-    if (!map[id]) map[id] = [];
-    map[id].push(prereq);
-  });
-  return map;
-}
-
 // Divide into three columns as equally as possible
 function splitSectionsIntoColumns<T>(sections: T[]): T[][] {
-  const cols = [[], [], []];
+  const cols: T[][] = [[], [], []];
   sections.forEach((s, i) => cols[i % 3].push(s));
   return cols;
 }
@@ -87,25 +20,14 @@ export default function App() {
   const [copyStatus, setCopyStatus] = useState('');
   const [flashStates, setFlashStates] = useState<Record<string, 'enabled' | 'disabled' | null>>({});
   const [codeDiff, setCodeDiff] = useState<{oldLines: Set<number>, newLines: Set<number>} | null>(null);
-  const prevConfigRef = useRef<Record<string, any>>(derive(defaultConfig()));
+  const prevConfigRef = useRef<TreapConfig>(derive(defaultConfig()));
   const prevCodeRef = useRef<string>('');
-  const flashTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const diffTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const diffTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const disabled = computeDisabled(config);
-  const prereqs = prereqMap();
   const columns = splitSectionsIntoColumns(SECTIONS);
 
-  function enableWithDependencies(cfg: Record<string, any>, key: string, visited = new Set<string>()) {
-    if (visited.has(key)) return;
-    visited.add(key);
-    (prereqs[key] || []).forEach(prereq => {
-      enableWithDependencies(cfg, prereq, visited);
-      enableFeature(cfg, prereq);
-    });
-    enableFeature(cfg, key);
-  }
-
-  function commitConfig(next: Record<string, any>, sourceKey?: string) {
+  function commitConfig(next: TreapConfig, sourceKey?: string) {
     let newConfig = derive(next);
     if (sourceKey && !isEnabled(config, sourceKey) && isEnabled(newConfig, sourceKey)) {
       preferences
@@ -125,7 +47,7 @@ export default function App() {
         if (f.type === "select") {
           // Reset selects to default (first option)
           if (newConfig[f.key] !== f.options?.[0]?.value) {
-            newConfig[f.key] = f.options?.[0]?.value;
+            newConfig[f.key] = f.options?.[0]?.value ?? '';
             needsReset = true;
           }
         } else {
@@ -274,8 +196,13 @@ export default function App() {
     <div className="min-h-screen bg-gray-100 flex flex-col items-center py-4">
       <h1 className="text-4xl font-bold mb-4 text-blue-700 text-center">Build Your Own Treap</h1>
       <div className="max-w-[1770px] mx-4 rounded border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-gray-800">
-        Pick the treap features you want and the generated C++ updates immediately. Disabled controls are waiting on prerequisites; double-click a disabled option to enable its prerequisites automatically. Right-click also works on supported browsers.
+        Pick the treap features you want and the generated C++ updates immediately. Disabled controls need prerequisites or conflict with other features; double-click a disabled option to enable its prerequisites and resolve conflicts automatically. Right-click also works on supported browsers.
       </div>
+      {config.key_type !== 'none' && (config.range_reverse_key || config.range_reverse_index || config.rot_option || config.key_add || config.key_set) && (
+        <div role="note" className="max-w-[1770px] mx-4 mt-3 rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Key-based operations require sorted keys. Reversal, rotation, and key updates can break that invariant. Use index-based operations after reordering, or restore key order before using key-based operations again.
+        </div>
+      )}
       <div className="w-full flex flex-row gap-8 justify-center mt-4">
         {/* Settings: 3 buffed cards, code card exactly 2x width (desktop only layout). */}
         <div className="flex flex-row gap-6 flex-none">
