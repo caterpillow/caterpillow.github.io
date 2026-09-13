@@ -8,7 +8,8 @@
     "preview": "vite preview",
     "build:page": "npm run build && node build-page.js",
     "typecheck": "tsc --noEmit --strict --target ES2020 --module ESNext --moduleResolution Bundler --jsx react-jsx --esModuleInterop --skipLibCheck src/index.tsx",
-    "test": "npm run test:byot --",
+    "test": "npm run test:ui && npm run test:byot --",
+    "test:ui": "node tools/byot-ui-test.mjs",
     "test:byot": "node tools/byot-test.mjs"
   },
   "dependencies": {
