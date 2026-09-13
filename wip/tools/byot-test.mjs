@@ -312,6 +312,7 @@ function buildStressCases() {
   return [
     ...regressionCases(),
     ...pointerApiCases(),
+    ...wrapperCases(),
     {
       name: "stress-index-inc-exc",
       config: indexLazyConfig("inc exc"),
@@ -872,6 +873,10 @@ function compileCalls(cfg) {
   if (cfg.tour_option) calls += "tour(n, [](ptr) {});\n";
   if (cfg.augmented_ptr && cfg.succ) calls += "for (Node& node : n) (void)node; (void)std::next(n);\n";
   if (cfg.plus_merge_option) calls += "ptr a, b; n = a + b; n = a + ptr{}; n = ptr{} + b; n = ptr{} + ptr{}; a += b; a += ptr{};\n";
+  if (cfg.wrapper_type === 'set') calls += 'TreapSet container; container.insert({}); for (auto value : container) (void)value;\n';
+  if (cfg.wrapper_type === 'multiset') calls += 'TreapMultiset container; container.insert({}); container.erase_one({});\n';
+  if (cfg.wrapper_type === 'map') calls += 'TreapMap container; container[{}] = 1; container[{}] += 1; for (auto entry : container) (void)entry;\n';
+  if (cfg.wrapper_type === 'dynamic_array') calls += 'DynamicArray container; container.push_back(1); container[0] += 2; for (auto value : container) (void)value;\n';
   return calls;
 }
 
@@ -888,6 +893,15 @@ function pairwiseCompileCases() {
           ...(id % 5 === 0 ? { val_type: "long long" } : {}),
         });
         variants.push({ name: `${keys[i]}+${keys[j]}`, cfg });
+      } catch (error) {
+        if (!/Incompatible treap features/.test(error.message)) throw error;
+      }
+    }
+  }
+  for (const wrapper of ['set', 'multiset', 'map', 'dynamic_array']) {
+    for (const key of keys) {
+      try {
+        variants.push({ name: `${wrapper}+${key}`, cfg: configFor([key], { wrapper_type: wrapper, key_type: 'long long', val_type: 'long long' }) });
       } catch (error) {
         if (!/Incompatible treap features/.test(error.message)) throw error;
       }
@@ -1044,6 +1058,164 @@ int main() {
     });
   }
   return cases;
+}
+
+function wrapperCases() {
+  const cases = [{
+    name: 'wrapper-dynamic-array-beats',
+    config: configFor(['beats_chmin', 'beats_chmax', 'beats_add'], { wrapper_type: 'dynamic_array', val_type: 'long long' }),
+    body: beatsStressBody(7)
+      .replace('ptr n = nullptr;', 'DynamicArray n;')
+      .replace('n = merge(n, new Node(Value::make(x)))', 'n.push_back(x)')
+      .replaceAll('updi(n, ', 'n.update(')
+      .replaceAll('queryi(n, ', 'n.query(')
+      .replace('delete n;', ''),
+  }];
+  for (const wrapper_type of ['set', 'multiset', 'map', 'dynamic_array']) {
+    for (const array_storage of [false, true]) {
+      for (const size_biased_merge of [false, true]) {
+        const rangeType = size_biased_merge ? 'inc inc' : 'inc exc';
+        cases.push({
+          name: `wrapper-${wrapper_type}-${array_storage ? 'array' : 'heap'}-${size_biased_merge ? 'size' : 'priority'}`,
+          config: configFor(wrapper_type === 'map' ? ['key_sum', 'range_add', 'range_set', 'range_update_key'] : wrapper_type === 'dynamic_array' ? ['range_add', 'range_set', 'range_update_index', 'range_reverse_index', 'rot_option'] : [], {
+            wrapper_type, array_storage, size_biased_merge,
+            key_type: wrapper_type === 'dynamic_array' ? 'none' : 'long long',
+            val_type: wrapper_type === 'set' || wrapper_type === 'multiset' ? 'none' : 'long long', range_type: rangeType,
+          }),
+          body: wrapper_type === 'map' ? mapWrapperBody(rangeType) : wrapper_type === 'dynamic_array' ? arrayWrapperBody(rangeType) : setWrapperBody(wrapper_type === 'multiset'),
+        });
+      }
+    }
+  }
+  return cases;
+}
+
+function setWrapperBody(multi) {
+  const name = multi ? 'TreapMultiset' : 'TreapSet';
+  return `
+int main() {
+    static_assert(!is_copy_constructible_v<${name}>);
+    static_assert(is_nothrow_move_constructible_v<${name}>);
+    ${name} tree;
+    std::${multi ? 'multiset' : 'set'}<long long> brute;
+    mt19937 rng(111);
+    for (int step = 0; step < 400; ++step) {
+        long long key = (int(rng() % 21) - 10) * (1LL << 33);
+        if (rng() % 3) {
+            ${multi ? 'tree.insert(key); brute.insert(key);' : 'if (tree.insert(key).second != brute.insert(key).second) fail_test("set insertion uniqueness");'}
+        } else if (tree.erase(key) != int(brute.erase(key))) fail_test("wrapper erase count");
+        ${multi ? 'if (step % 17 == 0 && !brute.empty()) { long long k = *brute.begin(); if (!tree.erase_one(k)) fail_test("multiset erase_one"); brute.erase(brute.begin()); }' : ''}
+        if (tree.count(key) != int(brute.count(key)) || tree.contains(key) != (brute.count(key) != 0)) fail_test("wrapper lookup/count");
+        vector<long long> got(tree.begin(), tree.end()), expected(brute.begin(), brute.end());
+        if (got != expected || tree.size() != int(brute.size())) fail_test("ordered wrapper contents");
+        auto lo = tree.lower_bound(key), hi = tree.upper_bound(key);
+        auto blo = brute.lower_bound(key), bhi = brute.upper_bound(key);
+        if ((lo == tree.end()) != (blo == brute.end()) || (lo != tree.end() && *lo != *blo)) fail_test("wrapper lower_bound");
+        if ((hi == tree.end()) != (bhi == brute.end()) || (hi != tree.end() && *hi != *bhi)) fail_test("wrapper upper_bound");
+        if (tree.order_of_key(key) != distance(brute.begin(), blo)) fail_test("wrapper rank");
+        for (int i = 0; i < tree.size(); ++i) if (*tree.kth(i) != expected[i]) fail_test("wrapper kth");
+        if (tree.kth(tree.size()) != tree.end()) fail_test("wrapper kth bounds");
+    }
+    ${name} moved(std::move(tree));
+    if (!tree.empty() || moved.size() != int(brute.size())) fail_test("wrapper move construction");
+    tree = std::move(moved);
+    if (!moved.empty() || tree.size() != int(brute.size())) fail_test("wrapper move assignment");
+    tree.clear();
+    if (!tree.empty() || tree.begin() != tree.end()) fail_test("wrapper clear");
+    ${name} initialized{3, 1, 3};
+    if (initialized.size() != ${multi ? 3 : 2}) fail_test("wrapper initializer list");
+    tree.swap(initialized);
+    if (!initialized.empty() || tree.size() != ${multi ? 3 : 2}) fail_test("wrapper swap ownership");
+}
+`;
+}
+
+function mapWrapperBody(rangeType) {
+  return `
+int main() {
+    static_assert(!is_copy_constructible_v<TreapMap>);
+    TreapMap tree;
+    map<long long, long long> brute;
+    mt19937 rng(222);
+    for (int step = 0; step < 400; ++step) {
+        long long key = (int(rng() % 21) - 10) * (1LL << 33), value = int(rng() % 31) - 15;
+        switch (rng() % 6) {
+            case 0: if (tree.insert(key, value).second != brute.emplace(key, value).second) fail_test("map insert"); break;
+            case 1: tree[key] = value; brute[key] = value; break;
+            case 2: tree[key] += value; brute[key] += value; break;
+            case 3: if (tree.erase(key) != int(brute.erase(key))) fail_test("map erase"); break;
+            case 4: if (tree.insert_or_assign(key, value).second != brute.insert_or_assign(key, value).second) fail_test("map insert_or_assign"); break;
+            default:
+                tree[key] = tree[0]; brute[key] = brute[0];
+        }
+        vector<pair<long long, long long>> got;
+        for (auto [key, value] : tree) got.emplace_back(key, value);
+        vector<pair<long long, long long>> expected(brute.begin(), brute.end());
+        if (got != expected || tree.size() != int(brute.size())) fail_test("map wrapper contents");
+        long long sum = 0, keys = 0;
+        for (auto [k, v] : brute) { sum += v; keys += k; if (static_cast<long long>(tree.at(k)) != v) fail_test("map at"); }
+        auto aggregate = tree.query(LLONG_MIN, LLONG_MAX);
+        if (aggregate.sum != sum || aggregate.ksum != keys) fail_test("map proxy must repair aggregates and key sums");
+        if (step % 29 == 0) {
+            tree.add(LLONG_MIN, LLONG_MAX, 3);
+            for (auto& [k, v] : brute) v += 3;
+        }
+        if (step % 71 == 0) {
+            tree.assign(LLONG_MIN, LLONG_MAX, 4);
+            for (auto& [k, v] : brute) v = 4;
+        }
+    }
+    bool threw = false;
+    try { (void)tree.at(LLONG_MAX); } catch (const out_of_range&) { threw = true; }
+    if (!threw || tree.contains(LLONG_MAX)) fail_test("map at must not insert");
+    TreapMap moved = std::move(tree);
+    if (!tree.empty() || moved.size() != int(brute.size())) fail_test("map move");
+    moved.clear();
+    moved[9]++;
+    if (static_cast<long long>(moved[9]) != 1 || moved.size() != 1) fail_test("map default insertion/proxy increment");
+}
+`;
+}
+
+function arrayWrapperBody(rangeType) {
+  const hi = rangeType === 'inc inc' ? 'r - 1' : 'r';
+  return `
+int main() {
+    static_assert(!is_copy_constructible_v<DynamicArray>);
+    DynamicArray tree;
+    vector<long long> brute;
+    mt19937 rng(333);
+    for (int step = 0; step < 600; ++step) {
+        int n = brute.size(), op = rng() % 8;
+        if (n == 0 || (op == 0 && n < 30)) {
+            int at = rng() % (n + 1); long long x = int(rng() % 41) - 20;
+            tree.insert(at, x); brute.insert(brute.begin() + at, x);
+        } else {
+            int l = rng() % n, r = l + 1 + rng() % (n - l);
+            if (op == 1) { if (tree.erase(l) != brute[l]) fail_test("array erase return value"); brute.erase(brute.begin() + l); }
+            else if (op == 2) { tree[l] += 3; brute[l] += 3; }
+            else if (op == 3) { tree.reverse(l, ${hi}); reverse(brute.begin() + l, brute.begin() + r); }
+            else if (op == 4) { tree.rotate(l); rotate(brute.begin(), brute.begin() + l, brute.end()); }
+            else if (op == 5) { tree.add(l, ${hi}, 2); for (int i = l; i < r; ++i) brute[i] += 2; }
+            else if (op == 6) { tree.assign(l, ${hi}, -7); for (int i = l; i < r; ++i) brute[i] = -7; }
+            else { tree[l] = tree[r - 1]; brute[l] = brute[r - 1]; }
+        }
+        const DynamicArray& c = tree;
+        if (tree.size() != int(brute.size()) || vector<long long>(c.begin(), c.end()) != brute) fail_test("array wrapper contents");
+        for (int i = 0; i < tree.size(); ++i) if (c[i] != brute[i]) fail_test("array subscript");
+        int r = brute.size();
+        if (tree.query(0, ${hi}).sum != accumulate(brute.begin(), brute.end(), 0LL)) fail_test("array proxy aggregates");
+    }
+    bool threw = false;
+    try { tree.at(-1) = 0; } catch (const out_of_range&) { threw = true; }
+    if (!threw) fail_test("array bounds");
+    DynamicArray moved{1, 2, 3};
+    moved = std::move(tree);
+    if (!tree.empty() || moved.size() != int(brute.size())) fail_test("array move");
+    moved.clear(); moved.push_back(1); moved.push_front(2);
+    if (moved.pop_back() != 1 || moved.pop_front() != 2 || !moved.empty()) fail_test("array deque operations");
+}
+`;
 }
 
 function pointerApiCases() {
@@ -1414,7 +1586,7 @@ async function compileCase(name, source) {
   const bin = join(outDir, name);
   await writeFile(cpp, source);
   const flags = args.sanitize ? ["-O1", "-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer", "-fno-pie", "-no-pie"] : ["-O2"];
-  await execFileChecked("g++", ["-std=c++17", ...flags, "-pipe", cpp, "-o", bin], {
+  await execFileChecked("g++", ["-std=c++17", ...flags, "-fmax-errors=4", "-pipe", cpp, "-o", bin], {
     timeout: 60000,
     label: `compile ${name}`,
   });

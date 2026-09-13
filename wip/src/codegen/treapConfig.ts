@@ -1,5 +1,6 @@
 // BYOT modular code generator: blocks defined above
 import { normalizeConfig } from './depsUtil';
+import { generateWrapper } from './wrappers';
 
 export type TreapConfig = Record<string, boolean|string>;
 
@@ -1322,6 +1323,7 @@ export function generateTreapCode(cfg: TreapConfig): string {
   cfg = normalizeConfig(cfg);
   let code = '';
   ORDER.forEach(block => { if (fragments[block]) code += fragments[block](cfg); });
+  code += generateWrapper(cfg);
   code = code.trim() || '// Enable some features to generate code.';
 
   // Post-processing (from old byot.html)

@@ -34,6 +34,13 @@ export const features: FeatureMeta[] = [
     { value: "inc exc", label: "inc exc" },
     { value: "inc inc", label: "inc inc" },
   ] },
+  { key: "wrapper_type", label: "Container interface", section: "Wrapper", type: "select", tooltip: "Optional root-owning, move-only containers: TreapSet, TreapMultiset, TreapMap, or DynamicArray. Map/array values use the selected numeric value type; subscript writes repair aggregates. Iteration is read-only. Array-storage nodes remain in the shared arena after erase/clear. Wrappers do not support persistence.", options: [
+    { value: "none", label: "Raw functions" },
+    { value: "set", label: "TreapSet" },
+    { value: "multiset", label: "TreapMultiset" },
+    { value: "map", label: "TreapMap" },
+    { value: "dynamic_array", label: "DynamicArray" },
+  ] },
   // Pointer / Iterators
   { key: "augmented_ptr", label: "Augmented pointer (iterable ptr)", section: "Pointer/Iterators", tooltip: "Enable succ for forward range iteration and std::next. Predecessor traversal starts at mx(root), not end(); a null end pointer cannot remember a tree." },
   { key: "subscript", label: "Pointer operator[]", section: "Pointer/Iterators", type: "select", subOptionOf: "augmented_ptr", tooltip: "Returns a node handle by zero-based index or key. Requires values. Mutate values through modify/modifyi to keep aggregates valid.", options: [
@@ -190,6 +197,10 @@ export const edges: Array<[string, string]> = [
   ["subscript", "augmented_ptr"],
   ["subscript", "enable_value"],
   ["subscript_key_mode", "subscript"],
+  ["wrapper_type", "augmented_ptr"],
+  ["wrapper_type", "succ"],
+  ["wrapper_type", "findi_option"],
+  ["wrapper_type", "size_option"],
   ["plus_merge_option", "merge_option"],
   ["plus_merge_option", "augmented_ptr"],
   ["safe_merge_plus", "plus_merge_option"],
@@ -252,6 +263,19 @@ export function dependencyEdges(cfg: Record<string, boolean|string>): Array<[str
     result.push(['subscript', 'find_option']);
     if (cfg.subscript_key_mode === 'insert') result.push(['subscript_key_mode', 'ins_option']);
   }
+  const wrapper = cfg.wrapper_type;
+  if (wrapper === 'dynamic_array') {
+    for (const dep of ['merge_option', 'insi_option', 'deli_option', 'modi_option', 'range_query_index']) result.push(['wrapper_type', dep]);
+  } else if (wrapper === 'set' || wrapper === 'multiset' || wrapper === 'map') {
+    for (const dep of ['key_type', 'ins_option', 'del_option', 'del_all_option', 'find_option', 'lower_bound_option', 'upper_bound_option']) result.push(['wrapper_type', dep]);
+    if (wrapper === 'map') result.push(['wrapper_type', 'mod_option'], ['wrapper_type', 'range_query_key']);
+  }
+  if (wrapper === 'map' || wrapper === 'dynamic_array') {
+    result.push(['wrapper_type', 'enable_value']);
+    const beats = cfg.treap_beats || cfg.beats_chmin || cfg.beats_chmax || cfg.beats_add;
+    if (!beats) result.push(['wrapper_type', 'range_sum']);
+    if (beats && wrapper === 'map') result.push(['wrapper_type', 'range_update_key']);
+  }
   return result;
 }
 
@@ -264,6 +288,7 @@ export const preferences: Array<[string, string]> = [
 export const mutualExclusions: Array<[string, string]> = [
   ["persistent", "treap_beats"],
   ["persistent", "par_option"],
+  ["persistent", "wrapper_type"],
   ["treap_beats", "range_add"],
   ["treap_beats", "range_set"],
   ["treap_beats", "range_sum"],
