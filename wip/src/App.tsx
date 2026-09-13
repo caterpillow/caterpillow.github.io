@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { features, preferences } from "./codegen/features";
-import { computeDisabled, createDefaultConfig as defaultConfig, deriveConfig as derive, enableWithDependencies, isEnabled } from "./codegen/depsUtil";
+import { features } from "./codegen/features";
+import { computeDisabled, createDefaultConfig as defaultConfig, deriveConfig as derive, enableWithDependencies, setFeature } from "./codegen/depsUtil";
 import { ToggleGroup } from "./components/ToggleGroup";
 import { generateTreapCode, type TreapConfig } from "./codegen/treapConfig";
 import { TODO_TEXT } from "./TODO";
@@ -28,14 +28,7 @@ export default function App() {
   const columns = splitSectionsIntoColumns(SECTIONS);
 
   function commitConfig(next: TreapConfig, sourceKey?: string) {
-    let newConfig = derive(next);
-    if (sourceKey && !isEnabled(config, sourceKey) && isEnabled(newConfig, sourceKey)) {
-      preferences
-        .filter(([from]) => from === sourceKey)
-        .forEach(([, to]) => enableWithDependencies(newConfig, to));
-      newConfig = derive(newConfig);
-    }
-    setConfig(newConfig);
+    setConfig(sourceKey ? setFeature(config, sourceKey, next[sourceKey]) : derive(next));
   }
 
   // Reset disabled selects and checkboxes to default values immediately when they get disabled

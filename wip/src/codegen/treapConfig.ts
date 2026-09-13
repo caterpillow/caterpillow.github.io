@@ -7,6 +7,18 @@ function usesAugmentedPtr(cfg: TreapConfig) {
   return !!(cfg.augmented_ptr || cfg.array_storage);
 }
 
+function usesStrongPtr(cfg: TreapConfig) {
+  return usesAugmentedPtr(cfg) && !!(cfg.safe_merge_option || cfg.safe_merge_plus);
+}
+
+function partitionType(cfg: TreapConfig) {
+  return cfg.partition_result === 'optional' ? `std::optional<${cfg.key_type}>` : String(cfg.key_type);
+}
+
+function partitionNone(cfg: TreapConfig) {
+  return cfg.partition_result === 'optional' ? 'std::nullopt' : 'partition_none';
+}
+
 function arrayStorageSize(cfg: TreapConfig) {
   return String(cfg.array_storage_size || '1 << 17');
 }
@@ -140,14 +152,58 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
         s += `    friend ptr &operator+=(ptr &lhs, ptr &&rhs) { return lhs = merge(lhs, rhs); }\n`;
       }
       s += '\n';
-      s += '    inline ptr begin() { return mn(*this); }\n';
-      s += '    inline ptr end() { return ptr{nullptr}; }\n';
+      if (cfg.subscript === 'index') s += '    template<class Index, std::enable_if_t<std::is_integral_v<Index>, int> = 0>\n    ptr operator[](Index i) const;\n';
+      if (cfg.subscript === 'key') s += `    template<class Key, std::enable_if_t<std::is_convertible_v<Key, ${cfg.key_type}>, int> = 0>\n    ptr operator[](Key key)${cfg.subscript_key_mode === 'insert' ? '' : ' const'};\n`;
+      s += '    inline ptr begin() const { return mn(*this); }\n';
+      s += '    inline ptr end() const { return ptr{nullptr}; }\n';
       s += '};\n\n';
       s += 'inline ptr begin(ptr n) { return n.begin(); }\n';
       s += 'inline ptr end(ptr n) { return n.end(); }\n\n';
       return s;
     }
     return '';
+  },
+
+  strongPtrType: (cfg) => {
+    if (!usesStrongPtr(cfg)) return '';
+    let s = 'class strong_ptr {\n';
+    s += '    ptr p;\n';
+    s += 'public:\n';
+    s += '    strong_ptr(std::nullptr_t = nullptr) : p(nullptr) {}\n';
+    s += '    strong_ptr(ptr n) : p(n) {}\n';
+    s += '    strong_ptr(Node *n) : p(n) {}\n';
+    s += '    strong_ptr &operator=(ptr n) { p = n; return *this; }\n';
+    s += '    strong_ptr &operator=(Node *n) { p = n; return *this; }\n';
+    s += '    strong_ptr &operator=(std::nullptr_t) { p = nullptr; return *this; }\n';
+    s += '    operator ptr() const { return p; }\n';
+    s += '    explicit operator bool() const { return bool(p); }\n';
+    s += '    Node *get() const { return p.get(); }\n';
+    s += '    Node *operator->() const { return p.get(); }\n';
+    s += '    Node &operator*() const { return *p; }\n';
+    s += '    bool operator==(std::nullptr_t) const { return p == nullptr; }\n';
+    s += '    bool operator!=(std::nullptr_t) const { return p != nullptr; }\n';
+    s += '    bool operator==(strong_ptr n) const { return p == n.p; }\n';
+    s += '    bool operator!=(strong_ptr n) const { return p != n.p; }\n';
+    s += '    friend bool operator==(strong_ptr a, ptr b) { return a.p == b; }\n';
+    s += '    friend bool operator==(ptr a, strong_ptr b) { return a == b.p; }\n';
+    s += '    friend bool operator!=(strong_ptr a, ptr b) { return a.p != b; }\n';
+    s += '    friend bool operator!=(ptr a, strong_ptr b) { return a != b.p; }\n';
+    if (cfg.plus_merge_option) s += '    friend ptr operator+(strong_ptr a, strong_ptr b) { return ptr(a) + ptr(b); }\n';
+    s += '};\n\n';
+    return s;
+  },
+
+  subscriptFn: (cfg) => {
+    if (cfg.subscript === 'index') return 'template<class Index, std::enable_if_t<std::is_integral_v<Index>, int>>\nptr ptr::operator[](Index i) const {\n    if constexpr (std::is_signed_v<Index>) if (i < 0) return nullptr;\n    if (std::uintmax_t(i) >= std::uintmax_t(sz(*this))) return nullptr;\n    return findi(*this, int(i));\n}\n\n';
+    if (cfg.subscript !== 'key') return '';
+    const declaration = `template<class Key, std::enable_if_t<std::is_convertible_v<Key, ${cfg.key_type}>, int>>\n`;
+    if (cfg.subscript_key_mode !== 'insert') return declaration + `ptr ptr::operator[](Key key) const { return find(*this, static_cast<${cfg.key_type}>(key)); }\n\n`;
+    return declaration + `ptr ptr::operator[](Key key) {\n    ${cfg.key_type} k = key;\n    if (ptr n = find(*this, k)) return n;\n    ins(*this, ptr::make(k));\n    return find(*this, k);\n}\n\n`;
+  },
+
+  partitionConst: (cfg) => {
+    if (cfg.partition_result === 'optional' || !(cfg.partition_key || cfg.cumulative_partition_key)) return '';
+    return `static_assert(std::numeric_limits<${cfg.key_type}>::is_specialized, "Use optional partitions for keys without numeric_limits");\nconst ${cfg.key_type} partition_none = std::numeric_limits<${cfg.key_type}>::max();\n\n`;
   },
 
   valueStruct: (cfg) => {
@@ -324,8 +380,10 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
 
     // Pointers
     const ptrNames: string[] = ["l", "r"];
-    if (cfg.par_option) ptrNames.push("par");
-    out += `    ptr ${ptrNames.join(", ")};\n\n`;
+    if (cfg.par_option && !usesStrongPtr(cfg)) ptrNames.push("par");
+    out += `    ptr ${ptrNames.join(", ")};\n`;
+    if (cfg.par_option && usesStrongPtr(cfg)) out += '    strong_ptr par;\n';
+    out += '\n';
 
     // Constructors
     const hasKey = cfg.key_type && cfg.key_type !== 'none';
@@ -728,17 +786,17 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     if (!cfg.partition_key) return '';
     const ktype = cfg.key_type && cfg.key_type !== 'none' ? cfg.key_type : 'int';
     let out = '';
-    if (cfg.comments) out += '// finds the smallest key such that pred returns false (nullopt if none)\n';
+    if (cfg.comments) out += `// finds the smallest key such that pred returns false (${partitionNone(cfg)} if none)\n`;
     out += 'template<typename Pred>\n';
-    out += `std::optional<${ktype}> partition_key(ptr n, Pred pred) {\n`;
-    out += '    if (!n) return std::nullopt;\n';
+    out += `${partitionType(cfg)} partition_key(ptr n, Pred pred) {\n`;
+    out += `    if (!n) return ${partitionNone(cfg)};\n`;
     if (cfg.persistent && cfg.lazy_prop) {
       out += persistScope(cfg);
       out += '    clone(n);\n';
     }
     if (cfg.lazy_prop) out += '    push(n);\n';
     out += '    if (pred(n)) return partition_key(n->r, pred);\n';
-    out += '    if (auto res = partition_key(n->l, pred)) return res;\n';
+    out += `    if (auto res = partition_key(n->l, pred); ${cfg.partition_result === 'optional' ? 'res.has_value()' : 'res != partition_none'}) return res;\n`;
     out += '    return n->key;\n';
     out += '}\n\n';
     return out;
@@ -765,12 +823,12 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     let out = '';
     if (cfg.comments) {
       out += '// given a predicate that will return true for some prefix of aggregates,\n';
-      out += '// find the key of the first prefix aggregate that makes the predicate false (nullopt if always true)\n';
+      out += `// find the key of the first prefix aggregate that makes the predicate false (${partitionNone(cfg)} if always true)\n`;
       out += '// eg. find the smallest prefix that has sum > x\n';
     }
     out += 'template <typename Pred>\n';
-    out += `std::optional<${ktype}> cumulative_partition_key(ptr n, Pred pred, Value acc = vid) {\n`;
-    out += '    if (!n) return std::nullopt;\n';
+    out += `${partitionType(cfg)} cumulative_partition_key(ptr n, Pred pred, Value acc = vid) {\n`;
+    out += `    if (!n) return ${partitionNone(cfg)};\n`;
     if (cfg.persistent && cfg.lazy_prop) {
       out += persistScope(cfg);
       out += '    clone(n);\n';
@@ -1244,7 +1302,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
 // Unified, stable total order (no duplicates) for all blocks
 const ORDER = [
   'intro', 'comment',
-  'forwardDecls', 'ptrType',
+  'forwardDecls', 'ptrType', 'strongPtrType', 'partitionConst',
   'lazyStruct', 'valueStruct',
   'vidConst', 'lidConst', 'beatsTagHelpers',
   'nodeStruct',
@@ -1253,7 +1311,7 @@ const ORDER = [
   'szFn', 'aggFn',
   'pushFn', 'pullFn', 'mergeFn', 'safeMergeFn', 'nMergeFn', 'splitFn',
   'threeSplit', 'splitiFn', 'threeSplitIndex', 'findFn', 'findiFn', 'insFn', 'delFn', 'delAllFn', 'insiFn', 'deliFn', 'minFn', 'maxFn',
-  'modFn','modIndexFn', 'rotateFn',
+  'subscriptFn', 'modFn','modIndexFn', 'rotateFn',
   'cleanFn', 'succFn','predFn', 'orderFn', 'rootFn',
   'lowerBound', 'upperBound', 'partitionKey','partitionIndex','cumulativePartitionKey','cumulativePartitionIndex',
   'uniteFn','uniteFastFn','heapifyFn','buildFn','tourFn',

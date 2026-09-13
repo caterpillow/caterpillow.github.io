@@ -1,5 +1,6 @@
 import React from "react";
 import { FeatureMeta } from "../codegen/features";
+import { isVisible } from "../codegen/depsUtil";
 
 interface ToggleGroupProps {
   groupName: string;
@@ -42,7 +43,7 @@ export function ToggleGroup({ groupName, features, config, setConfig, disabledMa
   }
   // Separate regular features from suboptions
   const regularFeatures = features.filter(f => !f.subOptionOf);
-  const subOptionsByParent = features.filter(f => f.subOptionOf).reduce((acc, f) => {
+  const subOptionsByParent = features.filter(f => f.subOptionOf && isVisible(config, f.key)).reduce((acc, f) => {
     if (!acc[f.subOptionOf!]) acc[f.subOptionOf!] = [];
     acc[f.subOptionOf!].push(f);
     return acc;

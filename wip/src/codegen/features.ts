@@ -7,6 +7,7 @@ export interface FeatureMeta {
   type?: "checkbox" | "select";
   options?: Array<{ value: string, label: string }>;
   subOptionOf?: string; // If set, this is a suboption that only appears when parent is enabled
+  visibleWhen?: Record<string, boolean|string>;
 }
 
 // All toggles and selects from byot.html
@@ -35,6 +36,15 @@ export const features: FeatureMeta[] = [
   ] },
   // Pointer / Iterators
   { key: "augmented_ptr", label: "Augmented pointer (iterable ptr)", section: "Pointer/Iterators", tooltip: "Enable succ for forward range iteration and std::next. Predecessor traversal starts at mx(root), not end(); a null end pointer cannot remember a tree." },
+  { key: "subscript", label: "Pointer operator[]", section: "Pointer/Iterators", type: "select", subOptionOf: "augmented_ptr", tooltip: "Returns a node handle by zero-based index or key. Requires values. Mutate values through modify/modifyi to keep aggregates valid.", options: [
+    { value: "none", label: "None" },
+    { value: "index", label: "Index" },
+    { value: "key", label: "Key" },
+  ] },
+  { key: "subscript_key_mode", label: "Missing key", section: "Pointer/Iterators", type: "select", subOptionOf: "augmented_ptr", visibleWhen: { subscript: "key" }, tooltip: "Lookup returns nullptr for a missing key. Insert mode creates a zero/default-valued node and updates the root, like map::operator[].", options: [
+    { value: "nullptr", label: "Return nullptr" },
+    { value: "insert", label: "Insert default value" },
+  ] },
   { key: "array_storage", label: "Array storage", section: "Pointer/Iterators", tooltip: "Store nodes in one static array and represent augmented ptr as an index." },
   { key: "array_storage_size", label: "Node array size", section: "Pointer/Iterators", type: "select", subOptionOf: "array_storage", options: [
     { value: "1 << 17", label: "2^17" },
@@ -51,10 +61,10 @@ export const features: FeatureMeta[] = [
   // Merge options
   { key: "merge_option", label: "Include merge", section: "Core" },
   { key: "size_biased_merge", label: "Randomized size merge", section: "Core", tooltip: "Merge chooses the root proportional to subtree sizes instead of storing node priorities. Required for persistence." },
-  { key: "safe_merge_option", label: "Include safe merge", section: "Core", tooltip: "When merging an lvalue, it will set its pointer to null." },
+  { key: "safe_merge_option", label: "Include safe merge", section: "Core", tooltip: "Clears ordinary ptr lvalues after merging. With augmented pointers, strong_ptr handles (including parent pointers) are not consumed. A strong_ptr is non-owning and does not survive node deletion." },
   { key: "n_merge_option", label: "Include n-way merge", section: "Core" },
   { key: "plus_merge_option", label: "Include + merge", section: "Core" },
-  { key: "safe_merge_plus", label: "Safe merge", section: "Core", subOptionOf: "plus_merge_option", tooltip: "When merging an lvalue, it will set its pointer to null." },
+  { key: "safe_merge_plus", label: "Safe merge", section: "Core", subOptionOf: "plus_merge_option", tooltip: "Clears ordinary ptr lvalues after merging. With augmented pointers, strong_ptr handles (including parent pointers) are not consumed. A strong_ptr is non-owning and does not survive node deletion." },
   // Key type & split options
   { key: "key_type", label: "Choose key type", section: "Key/Index", type: "select", options: [
     { value: "none", label: "None" },
@@ -81,9 +91,13 @@ export const features: FeatureMeta[] = [
   // Partition options
   { key: "lower_bound_option", label: "Lower bound (key)", section: "Partition" },
   { key: "upper_bound_option", label: "Upper bound (key)", section: "Partition" },
-  { key: "partition_key", label: "Find partition key", section: "Partition", tooltip: "Returns an optional key: the first node where a monotone predicate is false, or nullopt if there is no match." },
+  { key: "partition_result", label: "Missing partition key", section: "Partition", type: "select", tooltip: "The default max-value sentinel is concise for CP, but cannot distinguish a missing result from an actual maximum key. Choose optional if that distinction matters or the key type has no numeric_limits specialization.", options: [
+    { value: "max", label: "Key type maximum" },
+    { value: "optional", label: "std::optional" },
+  ] },
+  { key: "partition_key", label: "Find partition key", section: "Partition", tooltip: "Finds the first node where a monotone predicate is false. The missing-result convention is configurable above." },
   { key: "partition_index", label: "Find partition index", section: "Partition" },
-  { key: "cumulative_partition_key", label: "Find cumulative partition key", section: "Partition", tooltip: "Returns an optional key for the first prefix aggregate where a monotone predicate is false, or nullopt if there is no match." },
+  { key: "cumulative_partition_key", label: "Find cumulative partition key", section: "Partition", tooltip: "Finds the first prefix aggregate where a monotone predicate is false. Uses the configured maximum-value or optional missing-result convention." },
   { key: "cumulative_partition_index", label: "Find cumulative partition index", section: "Partition" },
   // Misc node ops
   { key: "max_option", label: "Include max", section: "Misc Ops" },
@@ -173,6 +187,9 @@ export const edges: Array<[string, string]> = [
   ["key_sum", "range_agg"],
   ["range_agg", "val_type"],
   ["array_storage", "augmented_ptr"],
+  ["subscript", "augmented_ptr"],
+  ["subscript", "enable_value"],
+  ["subscript_key_mode", "subscript"],
   ["plus_merge_option", "merge_option"],
   ["plus_merge_option", "augmented_ptr"],
   ["safe_merge_plus", "plus_merge_option"],
@@ -227,6 +244,16 @@ export const edges: Array<[string, string]> = [
   ["succ", "par_option"],
   ["pred", "par_option"],
 ];
+
+export function dependencyEdges(cfg: Record<string, boolean|string>): Array<[string, string]> {
+  const result = [...edges];
+  if (cfg.subscript === 'index') result.push(['subscript', 'findi_option']);
+  if (cfg.subscript === 'key') {
+    result.push(['subscript', 'find_option']);
+    if (cfg.subscript_key_mode === 'insert') result.push(['subscript_key_mode', 'ins_option']);
+  }
+  return result;
+}
 
 export const preferences: Array<[string, string]> = [
   ["augmented_ptr", "plus_merge_option"],

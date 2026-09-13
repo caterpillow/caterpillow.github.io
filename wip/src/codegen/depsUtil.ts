@@ -1,4 +1,4 @@
-import { edges, features, mutualExclusions } from './features'
+import { dependencyEdges, features, mutualExclusions, preferences } from './features'
 
 // Helper to determine if a dependency is satisfied (including selects with 'none')
 export function isEnabled(config: Record<string, boolean|string>, dep: string): boolean {
@@ -43,12 +43,12 @@ export function topsort(pairs: Array<[string, string]>): string[] {
 // Determine if a feature should be disabled based on dependencies (fix for selects)
 export function computeDisabled(config: Record<string, boolean|string>) {
   const disabled: Record<string, boolean> = {};
-  for (const [id, dep] of edges) {
+  for (const [id, dep] of dependencyEdges(config)) {
     if (!isEnabled(config, dep)) disabled[id] = true;
   }
   for (const [id1, id2] of mutualExclusions) {
-    if (config[id1]) disabled[id2] = true;
-    if (config[id2]) disabled[id1] = true;
+    if (isEnabled(config, id1)) disabled[id2] = true;
+    if (isEnabled(config, id2)) disabled[id1] = true;
   }
   return disabled;
 }
@@ -66,30 +66,31 @@ export function createDefaultConfig(): Record<string, boolean|string> {
 }
 
 // Inverted dependency map: for every id gives a list of prerequisites (i.e. what you must enable to enable this)
-function prereqMap() {
+function prereqMap(cfg: Record<string, boolean|string>) {
   const map: Record<string, string[]> = {};
-  edges.forEach(([id, prereq]) => {
+  dependencyEdges(cfg).forEach(([id, prereq]) => {
     if (!map[id]) map[id] = [];
     map[id].push(prereq);
   });
   return map;
 }
 
-const prereqs = prereqMap();
-
 export function enableWithDependencies(cfg: Record<string, boolean|string>, key: string, resolveConflicts = true) {
   const visited = new Set<string>();
   function enable(id: string) {
     if (visited.has(id)) return;
     visited.add(id);
-    (prereqs[id] || []).forEach(enable);
     const feature = features.find(f => f.key === id);
     if (!feature) return;
     if (!isEnabled(cfg, id)) cfg[id] = feature.type === 'select' ? feature.options?.[1]?.value || '' : true;
+    (prereqMap(cfg)[id] || []).forEach(enable);
     if (resolveConflicts) {
       for (const [a, b] of mutualExclusions) {
         const other = a === id ? b : b === id ? a : undefined;
-        if (other) cfg[other] = false;
+        if (other) {
+          const f = features.find(feature => feature.key === other);
+          cfg[other] = f?.type === 'select' ? f.options?.[0]?.value || '' : false;
+        }
       }
     }
   }
@@ -101,7 +102,7 @@ export function deriveConfig(config: Record<string, boolean|string>) {
   let changed = true;
   while (changed) {
     changed = false;
-    for (const [id, dep] of edges) {
+    for (const [id, dep] of dependencyEdges(cfg)) {
       if (isEnabled(cfg, id) && !isEnabled(cfg, dep)) {
         const feature = features.find(f => f.key === id);
         cfg[id] = feature?.type === 'select' ? feature.options?.[0]?.value || '' : false;
@@ -114,13 +115,29 @@ export function deriveConfig(config: Record<string, boolean|string>) {
   return cfg;
 }
 
+export function setFeature(config: Record<string, boolean|string>, key: string, value: boolean|string) {
+  const cfg = { ...config, [key]: value };
+  if (isEnabled(cfg, key)) {
+    enableWithDependencies(cfg, key);
+    if (!isEnabled(config, key)) {
+      for (const [from, to] of preferences) if (from === key) enableWithDependencies(cfg, to);
+    }
+  }
+  return deriveConfig(cfg);
+}
+
+export function isVisible(config: Record<string, boolean|string>, key: string): boolean {
+  const f = features.find(feature => feature.key === key);
+  return !!f && (!f.subOptionOf || isEnabled(config, f.subOptionOf)) && Object.entries(f.visibleWhen || {}).every(([id, value]) => config[id] === value);
+}
+
 export function normalizeConfig(config: Record<string, boolean|string>) {
   const cfg = { ...createDefaultConfig(), ...config };
   for (const feature of features) {
     if (isEnabled(cfg, feature.key)) enableWithDependencies(cfg, feature.key, false);
   }
   for (const [a, b] of mutualExclusions) {
-    if (cfg[a] && cfg[b]) throw new Error(`Incompatible treap features: ${a} and ${b}`);
+    if (isEnabled(cfg, a) && isEnabled(cfg, b)) throw new Error(`Incompatible treap features: ${a} and ${b}`);
   }
   return deriveConfig(cfg);
 }

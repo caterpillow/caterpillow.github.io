@@ -39,7 +39,7 @@ await esbuild.build({
   outfile: generatorBundle,
   logLevel: "silent",
 });
-const { generateTreapCode, features, edges, mutualExclusions, topsort, normalizeConfig, deriveConfig, enableWithDependencies, createDefaultConfig } = require(generatorBundle);
+const { generateTreapCode, features, edges, mutualExclusions, topsort, normalizeConfig, deriveConfig, enableWithDependencies, createDefaultConfig, setFeature, isVisible } = require(generatorBundle);
 const matches = testCase => !args.filter || testCase.name.includes(args.filter);
 const selectedCompile = mode === "stress" ? [] : buildCompileCases().filter(matches);
 const selectedStress = mode === "compile" ? [] : buildStressCases().filter(matches);
@@ -153,6 +153,19 @@ function assertGeneratorInvariants(generate) {
   assert.equal(deriveConfig(cfg).persistent, true);
   cfg.size_option = false;
   assert.equal(deriveConfig(cfg).persistent, false);
+  for (const mode of ['index', 'key']) {
+    let c = setFeature(createDefaultConfig(), 'subscript', mode);
+    assert.equal(c.enable_value, true);
+    assert.equal(c.augmented_ptr, true);
+    assert.equal(c[mode === 'index' ? 'findi_option' : 'find_option'], true);
+    assert.equal(isVisible(c, 'subscript_key_mode'), mode === 'key');
+    if (mode === 'key') {
+      c = setFeature(c, 'subscript_key_mode', 'insert');
+      assert.equal(c.ins_option, true);
+    }
+    c = setFeature(c, 'enable_value', false);
+    assert.equal(c.subscript, 'none');
+  }
 }
 
 function buildCompileCases() {
@@ -298,6 +311,7 @@ function buildCompileCases() {
 function buildStressCases() {
   return [
     ...regressionCases(),
+    ...pointerApiCases(),
     {
       name: "stress-index-inc-exc",
       config: indexLazyConfig("inc exc"),
@@ -1032,6 +1046,97 @@ int main() {
   return cases;
 }
 
+function pointerApiCases() {
+  const cases = [];
+  for (const array_storage of [false, true]) {
+    cases.push({
+      name: `api-strong-${array_storage ? "array" : "heap"}`,
+      config: configFor(["safe_merge_option", "safe_merge_plus", "size_option", "par_option", "root_option", "order_option"], { key_type: "int", array_storage }),
+      body: `
+int main() {
+    static_assert(sizeof(strong_ptr) == sizeof(ptr));
+    static_assert(!is_convertible_v<strong_ptr&, ptr&>);
+    static_assert(is_same_v<decltype(Node{}.par), strong_ptr>);
+    strong_ptr a = ptr::make(1), b = ptr::make(2);
+    Node* saved = a.get();
+    ptr n = safe_merge(a, b);
+    if (!a || !b || a.get() != saved || sz(n) != 2 || root(a) != n || order(b) != 1) fail_test("safe merge consumed a strong handle");
+    strong_ptr parent = b->par;
+    if (parent != b->par || a != ptr(a) || ptr(a) != a || strong_ptr{} != nullptr) fail_test("strong handle comparisons");
+    ptr c = ptr::make(3);
+    n = safe_merge(n, c);
+    if (c || !a || !b || sz(n) != 3) fail_test("ordinary handles must still be consumed");
+    delete n;
+    a = new Node(4); b = ptr::make(5);
+    n = a + b;
+    if (!a || !b || sz(n) != 2) fail_test("plus merge consumed a strong handle");
+    c = ptr::make(6); n = n + c;
+    if (c || sz(n) != 3) fail_test("mixed plus merge");
+    delete n;
+}
+`,
+    });
+    for (const mode of ["index", "key"]) {
+      for (const insert of mode === "key" ? [false, true] : [false]) {
+        cases.push({
+          name: `api-subscript-${mode}-${insert ? "insert" : "find"}-${array_storage ? "array" : "heap"}`,
+          config: configFor(["range_sum", "merge_option", "size_option", ...(mode === "key" ? ["ins_option"] : [])], {
+            augmented_ptr: true,
+            array_storage,
+            key_type: mode === "key" ? "long long" : "none",
+            val_type: "long long",
+            subscript: mode,
+            subscript_key_mode: insert ? "insert" : "nullptr",
+          }),
+          body: mode === "index" ? `
+int main() {
+    ptr n = nullptr;
+    for (int i = 0; i < 7; ++i) n = merge(n, ptr::make(Value::make(i + 10)));
+    const ptr& c = n;
+    for (int i = 0; i < 7; ++i) if (!c[i] || c[i]->val.sum != i + 10) fail_test("index subscript");
+    if (n[-1] || n[7] || n[1ULL << 32] || ptr{}[0]) fail_test("out-of-range index subscript");
+    if (n[size_t(3)]->val.sum != 13) fail_test("unsigned index subscript");
+    delete n;
+}
+` : `
+int main() {
+    ptr n = nullptr;
+    const long long key = 1LL << 40;
+    ins(n, ptr::make(key, Value::make(42)));
+    if (!n[key] || n[key]->val.sum != 42) fail_test("key subscript truncated its key");
+    ptr missing = n[key + 1];
+    ${insert ? 'if (!missing || missing->val.sum != 0 || sz(n) != 2 || n[key + 1] != missing) fail_test("map-like subscript must insert exactly once");' : 'if (missing || sz(n) != 1) fail_test("lookup-only subscript must not insert");'}
+    delete n;
+}
+`,
+        });
+      }
+    }
+  }
+  for (const type of ["int", "long long"]) {
+    cases.push({
+      name: `api-partition-max-${type.replace(" ", "-")}`,
+      config: configFor(["partition_key", "cumulative_partition_key", "ins_option", "range_sum"], { key_type: type }),
+      body: `
+int main() {
+    using K = ${type};
+    auto key_pred = [](ptr n) { return n->key < 4; };
+    auto sum_pred = [](Value v) { return v.sum <= 1; };
+    static_assert(is_same_v<decltype(partition_key(nullptr, key_pred)), K>);
+    if (partition_key(nullptr, key_pred) != numeric_limits<K>::max()) fail_test("empty max sentinel");
+    if (cumulative_partition_key(nullptr, sum_pred) != numeric_limits<K>::max()) fail_test("empty cumulative max sentinel");
+    ptr n = nullptr;
+    for (K k : {K(1), K(10), numeric_limits<K>::max()}) ins(n, new Node(k, Value::make(1)));
+    if (partition_key(n, key_pred) != 10 || cumulative_partition_key(n, sum_pred) != 10) fail_test("max sentinel partition boundary");
+    if (partition_key(n, [](ptr) { return true; }) != numeric_limits<K>::max()) fail_test("max sentinel no match");
+    delete n;
+}
+`,
+    });
+  }
+  return cases;
+}
+
 function extendedRegressionCases() {
   const cases = [];
   for (const type of ["int", "long long"]) {
@@ -1080,7 +1185,7 @@ int main() {
   });
   cases.push({
     name: "regression-partitions",
-    config: configFor(["ins_option", "range_sum", "range_add", "range_update_index", "partition_key", "partition_index", "cumulative_partition_key", "cumulative_partition_index"], { key_type: "long long", val_type: "long long" }),
+    config: configFor(["ins_option", "range_sum", "range_add", "range_update_index", "partition_key", "partition_index", "cumulative_partition_key", "cumulative_partition_index"], { key_type: "long long", val_type: "long long", partition_result: "optional" }),
     body: `
 int main() {
     vector<long long> keys = {-(1LL << 40), 3, 1000, LLONG_MAX};
