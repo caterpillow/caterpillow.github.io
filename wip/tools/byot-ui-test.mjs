@@ -11,10 +11,10 @@ const dir = await mkdtemp(join(tmpdir(), 'byot-ui-test-'));
 try {
   const bundle = join(dir, 'ui.cjs');
   await build({
-    stdin: { contents: 'export * from "./src/uiModel"; export * from "./src/codegen/features";', resolveDir: root, loader: 'ts' },
+    stdin: { contents: 'export * from "./src/uiModel"; export * from "./src/codegen/features"; export * from "./src/codegen/depsUtil";', resolveDir: root, loader: 'ts' },
     bundle: true, platform: 'node', format: 'cjs', outfile: bundle, logLevel: 'silent',
   });
-  const { diffLines, highlightCpp, clampRatio, settingsTab, TABS, features } = createRequire(import.meta.url)(bundle);
+  const { diffLines, highlightCpp, clampRatio, settingsSection, SETTINGS_SECTIONS, features, partitionGroups, columnCount, createDefaultConfig, setFeature, setAvailableFeature, activateFeature, computeDisabled } = createRequire(import.meta.url)(bundle);
   const rows = diffLines('a\nx\na\nb', 'a\na\nb');
   assert.deepEqual(rows.map(r => r.kind), ['equal', 'remove', 'equal', 'equal']);
   assert.equal(rows[1].text, 'x');
@@ -61,8 +61,45 @@ try {
     assert.equal(clampRatio(0.5, extent), 0.5);
     assert(Number.isFinite(clampRatio(NaN, extent)));
   }
-  for (const feature of features) assert(TABS.some(tab => tab.id === settingsTab(feature)), `unreachable feature: ${feature.key}`);
-  console.log('OK: UI diff, C++ highlighting, split bounds, and settings navigation tests passed');
+  const base = createDefaultConfig();
+  assert.equal(computeDisabled(base).findi_option, true);
+  assert.equal(setAvailableFeature(base, 'findi_option', true).findi_option, false);
+  const active = activateFeature(base, 'findi_option');
+  assert.equal(active.findi_option, true);
+  assert.equal(active.size_option, true);
+  assert.equal(!!computeDisabled(active).findi_option, false);
+  const off = setAvailableFeature(active, 'findi_option', false);
+  assert.equal(off.findi_option, false);
+  assert.equal(!!computeDisabled(off).findi_option, false);
+  const unavailable = setAvailableFeature(active, 'size_option', false);
+  assert.equal(unavailable.findi_option, false);
+  assert.equal(computeDisabled(unavailable).findi_option, true);
+  const array = setFeature(base, 'wrapper_type', 'dynamic_array');
+  assert.equal(setAvailableFeature(array, 'subscript', 'key').subscript, 'index');
+
+  const cost = (columns, heights, gap) => Math.max(0, ...columns.map(column => column.reduce((sum, i) => sum + heights[i], 0) + Math.max(0, column.length - 1) * gap));
+  assert.equal(cost(partitionGroups([30, 30, 20, 20, 20], 2, 0), [30, 30, 20, 20, 20], 0), 60);
+  assert(columnCount(1400, 6) > 2);
+  assert.equal(columnCount(300, 6), 1);
+  assert.equal(columnCount(3000, 3), 3);
+  assert.deepEqual(partitionGroups([], 4), []);
+  for (let rep = 0; rep < 70; ++rep) {
+    const heights = Array.from({ length: 1 + random() % 7 }, () => (random() % 60) / 2);
+    const count = 1 + random() % Math.min(3, heights.length), gap = random() % 9;
+    let optimum = Infinity;
+    const trial = Array.from({ length: count }, () => []);
+    const enumerate = i => {
+      if (i === heights.length) { optimum = Math.min(optimum, cost(trial, heights, gap)); return; }
+      for (const column of trial) { column.push(i); enumerate(i + 1); column.pop(); }
+    };
+    enumerate(0);
+    const actual = partitionGroups(heights, count, gap);
+    assert.deepEqual(actual.flat().sort((a, b) => a - b), heights.map((_, i) => i));
+    assert.equal(cost(actual, heights, gap), optimum);
+    assert.deepEqual(partitionGroups(heights, count, gap, actual), actual);
+  }
+  for (const feature of features) assert(SETTINGS_SECTIONS.some(section => section.id === settingsSection(feature)), `unreachable feature: ${feature.key}`);
+  console.log('OK: UI diffs, highlighting, availability, split bounds, and exact subsection partitioning tests passed');
 } finally {
   await rm(dir, { recursive: true, force: true });
 }

@@ -1,15 +1,15 @@
 import type { FeatureMeta } from './codegen/features';
 
-export const TABS = [
+export const SETTINGS_SECTIONS = [
   { id: 'treap', label: 'Treap' },
   { id: 'ops', label: 'Operations' },
   { id: 'values', label: 'Values' },
   { id: 'style', label: 'Style' },
 ] as const;
-export type TabId = typeof TABS[number]['id'];
+export type SectionId = typeof SETTINGS_SECTIONS[number]['id'];
 
-// Group sections into navigable tabs instead of fixed-width columns.
-export function settingsTab(feature: FeatureMeta): TabId {
+// Group controls into the four always-visible settings sections.
+export function settingsSection(feature: FeatureMeta): SectionId {
   if (['signature', 'comments', 'template'].includes(feature.key)) return 'style';
   if (['key_type', 'size_option', 'persistent'].includes(feature.key)) return 'treap';
   if (['Pointer/Iterators', 'Wrapper'].includes(feature.section)) return 'treap';
@@ -21,6 +21,55 @@ export function settingsTab(feature: FeatureMeta): TabId {
 export function clampRatio(ratio: number, extent: number) {
   const minimum = extent > 0 ? Math.min(0.45, Math.min(160, Math.max(96, extent * 0.2)) / Math.max(1, extent - 12)) : 0.2;
   return Math.max(minimum, Math.min(1 - minimum, Number.isFinite(ratio) ? ratio : 0.5));
+}
+
+export const COLUMN_GAP = 12;
+
+export function columnCount(width: number, groups: number) {
+  return groups ? Math.min(groups, Math.max(1, Math.floor(((Number.isFinite(width) ? width : 0) + COLUMN_GAP) / (260 + COLUMN_GAP)))) : 0;
+}
+
+export function partitionGroups(heights: number[], count: number, gap = COLUMN_GAP, preferred?: number[][]): number[][] {
+  const n = heights.length;
+  if (!n) return [];
+  const k = Math.max(1, Math.min(n, Math.trunc(count) || 1));
+  const weights = heights.map(height => Math.max(0, Number.isFinite(height) ? height : 0) + gap);
+  const order = heights.map((_, i) => i).sort((a, b) => weights[b] - weights[a] || a - b);
+  const score = (columns: number[][]) => Math.max(...columns.map(column => column.reduce((sum, i) => sum + weights[i], 0)));
+  const greedy: number[][] = Array.from({ length: k }, () => []);
+  const greedyLoads = Array(k).fill(0);
+  for (const i of order) {
+    let target = 0;
+    for (let j = 1; j < k; ++j) if (greedyLoads[j] < greedyLoads[target] || (greedyLoads[j] === greedyLoads[target] && greedy[j].length < greedy[target].length)) target = j;
+    greedy[target].push(i);
+    greedyLoads[target] += weights[i];
+  }
+  const validPreferred = preferred?.length === k && preferred.every(column => column.length > 0) && preferred.flat().sort((a, b) => a - b).every((index, i, all) => all.length === n && index === i);
+  let best = validPreferred ? preferred! : greedy;
+  if (score(greedy) < score(best) - 1e-7) best = greedy;
+  let bestScore = score(best);
+  const lowerBound = Math.max(...weights, weights.reduce((sum, height) => sum + height, 0) / k);
+  const columns: number[][] = Array.from({ length: k }, () => []);
+  const loads = Array(k).fill(0);
+  function search(position: number, maximum: number) {
+    if (bestScore <= lowerBound + 1e-7) return;
+    if (position === n) {
+      if (maximum < bestScore - 1e-7) { bestScore = maximum; best = columns.map(column => [...column]); }
+      return;
+    }
+    const i = order[position];
+    const seen = new Set<number>();
+    for (const target of loads.map((_, j) => j).sort((a, b) => loads[a] - loads[b])) {
+      if (seen.has(loads[target]) || loads[target] + weights[i] >= bestScore - 1e-7) continue;
+      seen.add(loads[target]);
+      loads[target] += weights[i]; columns[target].push(i);
+      search(position + 1, Math.max(maximum, loads[target]));
+      columns[target].pop(); loads[target] -= weights[i];
+    }
+  }
+  search(0, 0);
+  const result = best.map(column => [...column].sort((a, b) => a - b));
+  return best === preferred ? result : result.sort((a, b) => (a[0] ?? Infinity) - (b[0] ?? Infinity));
 }
 
 export interface DiffLine {

@@ -1,7 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { diffLines, highlightCpp, type DiffLine } from '../uiModel';
+import { diffLines, highlightCpp, type DiffLine, type Token } from '../uiModel';
 import { Dialog } from './Dialog';
 import { Icon } from './Icon';
+
+function CodeLine({ row, tokens, highlight, startedAt }: { row: DiffLine; tokens?: Token[]; highlight: boolean; startedAt: number }) {
+  const [elapsed] = useState(() => Math.max(0, performance.now() - startedAt));
+  return <span className={`code-line diff-${row.kind}`} style={{ animationDelay: `-${elapsed}ms` }}>
+    <span className="line-number" aria-hidden="true">{row.newLine ?? row.oldLine}</span>
+    <span className="change-marker" aria-hidden="true">{row.kind === 'add' ? '+' : row.kind === 'remove' ? '-' : ' '}</span>
+    <span className="line-source">{highlight && tokens ? tokens.map((token, j) => <span className={`tok-${token.kind}`} key={j}>{token.text}</span>) : row.text}{!row.text && '\u200b'}</span>
+  </span>;
+}
 
 export function CodePanel({ code, previous, onClearChanges }: { code: string; previous: string; onClearChanges: () => void }) {
   const panel = useRef<HTMLElement>(null);
@@ -13,12 +22,23 @@ export function CodePanel({ code, previous, onClearChanges }: { code: string; pr
   const [highlight, setHighlight] = useState(true);
   const [fontSize, setFontSize] = useState(13);
   const [notice, setNotice] = useState('');
-  const changes = useMemo(() => diffLines(previous, code), [previous, code]);
+  const batch = useMemo(() => ({ changes: diffLines(previous, code), startedAt: performance.now() }), [previous, code]);
+  const { changes } = batch;
+  const activeBatch = useRef(batch);
+  const clearChanges = useRef(onClearChanges);
+  activeBatch.current = batch;
+  clearChanges.current = onClearChanges;
   const currentTokens = useMemo(() => highlightCpp(code), [code]);
   const previousTokens = useMemo(() => highlightCpp(previous), [previous]);
   const rows: DiffLine[] = showChanges ? changes : code.split('\n').map((text, i) => ({ kind: 'equal', text, newLine: i + 1 }));
   const added = changes.filter(row => row.kind === 'add').length;
   const removed = changes.filter(row => row.kind === 'remove').length;
+
+  useEffect(() => {
+    if (code === previous) return;
+    const timer = setTimeout(() => { if (activeBatch.current === batch) clearChanges.current(); }, Math.max(0, 3000 - (performance.now() - batch.startedAt)));
+    return () => clearTimeout(timer);
+  }, [batch, code, previous]);
 
   useEffect(() => {
     const update = () => {
@@ -87,13 +107,9 @@ export function CodePanel({ code, previous, onClearChanges }: { code: string; pr
     <div className="code-scroll" tabIndex={0} aria-label="Scrollable C++ source" style={{ fontSize }}
       ref={element => { if (element) { element.scrollTop = scrollPosition.current.top; element.scrollLeft = scrollPosition.current.left; } }}
       onScroll={event => { scrollPosition.current = { top: event.currentTarget.scrollTop, left: event.currentTarget.scrollLeft }; }}>
-      <pre><code>{rows.map((row, i) => {
+      <pre><code key={code}>{rows.map((row, i) => {
         const tokens = row.kind === 'remove' ? previousTokens[(row.oldLine ?? 1) - 1] : currentTokens[(row.newLine ?? 1) - 1];
-        return <span className={`code-line diff-${row.kind}`} key={`${row.kind}-${row.oldLine}-${row.newLine}-${i}`}>
-          <span className="line-number" aria-hidden="true">{row.newLine ?? row.oldLine}</span>
-          <span className="change-marker" aria-hidden="true">{row.kind === 'add' ? '+' : row.kind === 'remove' ? '-' : ' '}</span>
-          <span className="line-source">{highlight && tokens ? tokens.map((token, j) => <span className={`tok-${token.kind}`} key={j}>{token.text}</span>) : row.text}{!row.text && '\u200b'}</span>
-        </span>;
+        return <CodeLine row={row} tokens={tokens} highlight={highlight} startedAt={batch.startedAt} key={`${batch.startedAt}-${row.kind}-${row.oldLine}-${row.newLine}-${i}`} />;
       })}</code></pre>
     </div>
     <footer className="code-status"><span role="status" aria-live="polite">{notice || 'C++17 · Copy excludes diff markers'}</span><span className="diff-count"><span>+{added}</span><span>−{removed}</span></span></footer>
