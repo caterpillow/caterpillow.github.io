@@ -1,4 +1,4 @@
-import { dependencyEdges, features, mutualExclusions, preferences } from './features'
+import { dependencyEdges, features, forcedOptions, mutualExclusions, preferences } from './features'
 
 // Helper to determine if a dependency is satisfied (including selects with 'none')
 export function isEnabled(config: Record<string, boolean|string>, dep: string): boolean {
@@ -76,6 +76,7 @@ function prereqMap(cfg: Record<string, boolean|string>) {
 }
 
 export function enableWithDependencies(cfg: Record<string, boolean|string>, key: string, resolveConflicts = true) {
+  Object.assign(cfg, forcedOptions(cfg));
   const visited = new Set<string>();
   function enable(id: string) {
     if (visited.has(id)) return;
@@ -98,7 +99,7 @@ export function enableWithDependencies(cfg: Record<string, boolean|string>, key:
 }
 
 export function deriveConfig(config: Record<string, boolean|string>) {
-  const cfg = { ...createDefaultConfig(), ...config };
+  const cfg = { ...createDefaultConfig(), ...config, ...forcedOptions(config) };
   let changed = true;
   while (changed) {
     changed = false;
@@ -117,6 +118,7 @@ export function deriveConfig(config: Record<string, boolean|string>) {
 
 export function setFeature(config: Record<string, boolean|string>, key: string, value: boolean|string) {
   const cfg = { ...config, [key]: value };
+  Object.assign(cfg, forcedOptions(cfg));
   if (isEnabled(cfg, key)) {
     enableWithDependencies(cfg, key);
     if (!isEnabled(config, key)) {
@@ -126,13 +128,25 @@ export function setFeature(config: Record<string, boolean|string>, key: string, 
   return deriveConfig(cfg);
 }
 
+export function setAvailableFeature(config: Record<string, boolean|string>, key: string, value: boolean|string) {
+  if (computeDisabled(config)[key] || key in forcedOptions(config)) return config;
+  return setFeature(config, key, value);
+}
+
+export function activateFeature(config: Record<string, boolean|string>, key: string) {
+  const feature = features.find(f => f.key === key);
+  if (!feature || key in forcedOptions(config)) return config;
+  const value = feature.type === 'select' ? isEnabled(config, key) ? config[key] : feature.options?.[1]?.value || '' : true;
+  return setFeature(config, key, value);
+}
+
 export function isVisible(config: Record<string, boolean|string>, key: string): boolean {
   const f = features.find(feature => feature.key === key);
   return !!f && (!f.subOptionOf || isEnabled(config, f.subOptionOf)) && Object.entries(f.visibleWhen || {}).every(([id, value]) => config[id] === value);
 }
 
 export function normalizeConfig(config: Record<string, boolean|string>) {
-  const cfg = { ...createDefaultConfig(), ...config };
+  const cfg = { ...createDefaultConfig(), ...config, ...forcedOptions(config) };
   for (const feature of features) {
     if (isEnabled(cfg, feature.key)) enableWithDependencies(cfg, feature.key, false);
   }

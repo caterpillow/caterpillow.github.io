@@ -189,7 +189,18 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     s += '    friend bool operator==(ptr a, strong_ptr b) { return a == b.p; }\n';
     s += '    friend bool operator!=(strong_ptr a, ptr b) { return a.p != b; }\n';
     s += '    friend bool operator!=(ptr a, strong_ptr b) { return a != b.p; }\n';
-    if (cfg.plus_merge_option) s += '    friend ptr operator+(strong_ptr a, strong_ptr b) { return ptr(a) + ptr(b); }\n';
+    s += '    template<class L, class R, std::enable_if_t<(std::is_same_v<std::decay_t<L>, strong_ptr> || std::is_same_v<std::decay_t<R>, strong_ptr>) && std::is_convertible_v<L, ptr> && std::is_convertible_v<R, ptr>, int> = 0>\n';
+    s += '    friend ptr operator+(L&& lhs, R&& rhs) {\n';
+    s += '        ptr res = merge(ptr(lhs), ptr(rhs));\n';
+    if (cfg.safe_merge_plus) {
+      s += '        if constexpr (std::is_same_v<L, ptr&>) lhs = nullptr;\n';
+      s += '        if constexpr (std::is_same_v<R, ptr&>) rhs = nullptr;\n';
+    }
+    s += '        return res;\n';
+    s += '    }\n';
+    s += '    friend ptr& operator+=(ptr& lhs, strong_ptr rhs) { return lhs = merge(lhs, ptr(rhs)); }\n';
+    s += '    template<class R, std::enable_if_t<std::is_convertible_v<R, ptr>, int> = 0>\n';
+    s += '    strong_ptr& operator+=(R&& rhs) { p = *this + std::forward<R>(rhs); return *this; }\n';
     s += '};\n\n';
     return s;
   },

@@ -23,7 +23,10 @@ export function generateWrapper(cfg: TreapConfig): string {
   code += 'ptr first(ptr n) { return mn(n); }\n';
   code += 'ptr next(ptr n) { return succ(n); }\n';
   code += 'ptr at_index(ptr n, int i) { return findi(n, i); }\n';
+  code += 'ptr join(ptr l, ptr r) { return merge(l, r); }\n';
+  code += `void divide(ptr& n, ${index} cut, ptr& right) { auto parts = ${array ? 'spliti' : 'split'}(n, cut); n = parts.first; right = parts.second; }\n`;
   if (!array) {
+    code += 'ptr last(ptr n) { return mx(n); }\n';
     code += `ptr lookup(ptr n, ${key} key) { return find(n, key); }\n`;
     code += 'void insert_key(ptr& n, ptr it) { ins(n, it); }\n';
     code += `ptr remove_key(ptr& n, ${key} key) { return del(n, key); }\n`;
@@ -71,6 +74,20 @@ export function generateWrapper(cfg: TreapConfig): string {
   code += `    int size() const { return wrapper_ops::size(${root}); }\n    bool empty() const { return !${root}; }\n`;
   code += `    void clear() { delete std::exchange(${root}, nullptr).get(); }\n`;
   code += `    void swap(${name}& other) noexcept { ${root} = std::exchange(other.${root}, ${root}); }\n\n`;
+  code += `    // Keep ${array ? '[0, cut); return [cut, size())' : 'keys < cut; return keys >= cut'} by transferring ownership without copying nodes.\n`;
+  code += `    ${name} split(${index} cut) {\n`;
+  if (array) code += '        if (cut < 0 || cut > size()) throw std::out_of_range("DynamicArray::split");\n';
+  code += `        ${name} right;\n        wrapper_ops::divide(${root}, cut, right.${root});\n        return right;\n    }\n`;
+  code += `    // Append rhs and empty it; ${array ? 'no node copies' : `require max(*this) ${multi ? '<=' : '<'} min(rhs)`}; self-merge is invalid.\n`;
+  code += `    ${name}& merge(${name}& rhs) {\n        if (this == &rhs) throw std::invalid_argument("Cannot merge a container into itself");\n`;
+  if (!array) {
+    const last = `wrapper_ops::last(${root})->key`, first = `wrapper_ops::first(rhs.${root})->key`;
+    code += `        if (!empty() && !rhs.empty() && ${multi ? `(${first} < ${last})` : `!(${last} < ${first})`})\n`;
+    code += '            throw std::invalid_argument("merge requires ordered, separated key ranges");\n';
+  }
+  code += `        ${root} = wrapper_ops::join(${root}, rhs.${root});\n        rhs.${root} = nullptr;\n        return *this;\n    }\n`;
+  code += '    // Append a temporary/moved rhs using the same ordering and ownership rules.\n';
+  code += `    ${name}& merge(${name}&& rhs) { return merge(rhs); }\n\n`;
   code += '    class const_iterator {\n        ptr n;\n    public:\n';
   code += `        using value_type = ${name}::value_type;\n        using difference_type = std::ptrdiff_t;\n`;
   code += `        using iterator_category = std::${numeric ? 'input' : 'forward'}_iterator_tag;\n`;

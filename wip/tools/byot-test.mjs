@@ -153,6 +153,12 @@ function assertGeneratorInvariants(generate) {
   assert.equal(deriveConfig(cfg).persistent, true);
   cfg.size_option = false;
   assert.equal(deriveConfig(cfg).persistent, false);
+  const sequence = setFeature(createDefaultConfig(), 'wrapper_type', 'dynamic_array');
+  assert.equal(sequence.subscript, 'index');
+  assert.equal(setFeature(sequence, 'subscript', 'key').subscript, 'index');
+  assert.equal(setFeature(sequence, 'subscript', 'key').key_type, sequence.key_type);
+  assert.equal(deriveConfig({ ...sequence, subscript: 'none' }).subscript, 'index');
+  assert.equal(normalizeConfig({ wrapper_type: 'dynamic_array', subscript: 'key' }).subscript, 'index');
   for (const mode of ['index', 'key']) {
     let c = setFeature(createDefaultConfig(), 'subscript', mode);
     assert.equal(c.enable_value, true);
@@ -1069,7 +1075,22 @@ function wrapperCases() {
       .replace('n = merge(n, new Node(Value::make(x)))', 'n.push_back(x)')
       .replaceAll('updi(n, ', 'n.update(')
       .replaceAll('queryi(n, ', 'n.query(')
+      .replace('if (step % 23 == 0)', 'if (step % 17 == 0) { auto right = n.split(l); n.merge(right); if (!right.empty()) fail_test("beats split/merge ownership"); }\n        if (step % 23 == 0)')
       .replace('delete n;', ''),
+  }, {
+    name: 'wrapper-split-merge-no-allocation',
+    config: configFor([], { wrapper_type: 'dynamic_array', array_storage: true, array_storage_size: '16' }),
+    body: `
+int main() {
+    DynamicArray values{1, 2, 3, 4, 5};
+    const int allocated = node_cnt;
+    for (int i = 0; i < 1000; ++i) {
+        auto right = values.split(i % 6);
+        values.merge(right);
+        if (node_cnt != allocated || values.size() != 5 || !right.empty() || values.all().sum != 15) fail_test("split/merge must transfer existing nodes");
+    }
+}
+`,
   }];
   for (const wrapper_type of ['set', 'multiset', 'map', 'dynamic_array']) {
     for (const array_storage of [false, true]) {
@@ -1115,6 +1136,15 @@ int main() {
         if (tree.order_of_key(key) != distance(brute.begin(), blo)) fail_test("wrapper rank");
         for (int i = 0; i < tree.size(); ++i) if (*tree.kth(i) != expected[i]) fail_test("wrapper kth");
         if (tree.kth(tree.size()) != tree.end()) fail_test("wrapper kth bounds");
+        if (step % 11 == 0) {
+            const long long* first = tree.empty() ? nullptr : &*tree.begin();
+            auto right = tree.split(key);
+            vector<long long> lhs(tree.begin(), tree.end()), rhs(right.begin(), right.end());
+            auto cut = lower_bound(expected.begin(), expected.end(), key);
+            if (lhs != vector<long long>(expected.begin(), cut) || rhs != vector<long long>(cut, expected.end())) fail_test("ordered container split");
+            tree.merge(right);
+            if (!right.empty() || vector<long long>(tree.begin(), tree.end()) != expected || (first && &*tree.begin() != first)) fail_test("ordered split/merge ownership");
+        }
     }
     ${name} moved(std::move(tree));
     if (!tree.empty() || moved.size() != int(brute.size())) fail_test("wrapper move construction");
@@ -1126,6 +1156,18 @@ int main() {
     if (initialized.size() != ${multi ? 3 : 2}) fail_test("wrapper initializer list");
     tree.swap(initialized);
     if (!initialized.empty() || tree.size() != ${multi ? 3 : 2}) fail_test("wrapper swap ownership");
+    ${name} left{1, 3}, right{3, 5};
+    bool rejected = false;
+    try { left.merge(right); } catch (const invalid_argument&) { rejected = true; }
+    ${multi ? 'if (rejected || left.size() != 4 || !right.empty()) fail_test("multiset equal-boundary merge");' : 'if (!rejected || left.size() != 2 || right.size() != 2) fail_test("set merge must reject duplicate boundary without consuming inputs");'}
+    rejected = false;
+    try { left.merge(left); } catch (const invalid_argument&) { rejected = true; }
+    if (!rejected) fail_test("self merge must not create cycles");
+    ${name} limits{LLONG_MIN, LLONG_MAX};
+    auto high = limits.split(LLONG_MAX);
+    if (limits.size() != 1 || high.size() != 1 || *high.begin() != LLONG_MAX) fail_test("split at maximum key");
+    limits.merge(std::move(high));
+    if (!high.empty() || limits.size() != 2) fail_test("rvalue merge");
 }
 `;
 }
@@ -1164,6 +1206,15 @@ int main() {
             tree.assign(LLONG_MIN, LLONG_MAX, 4);
             for (auto& [k, v] : brute) v = 4;
         }
+        if (step % 13 == 0) {
+            auto before = tree.all();
+            auto right = tree.split(key);
+            for (auto [k, v] : tree) if (k >= key || brute.at(k) != v) fail_test("map split left");
+            for (auto [k, v] : right) if (k < key || brute.at(k) != v) fail_test("map split right");
+            if (tree.all().sum + right.all().sum != before.sum || tree.all().ksum + right.all().ksum != before.ksum) fail_test("split must preserve pending aggregates");
+            tree.merge(std::move(right));
+            if (!right.empty() || tree.size() != int(brute.size()) || tree.all().sum != before.sum) fail_test("map consuming merge");
+        }
     }
     bool threw = false;
     try { (void)tree.at(LLONG_MAX); } catch (const out_of_range&) { threw = true; }
@@ -1173,6 +1224,10 @@ int main() {
     moved.clear();
     moved[9]++;
     if (static_cast<long long>(moved[9]) != 1 || moved.size() != 1) fail_test("map default insertion/proxy increment");
+    TreapMap overlap; overlap[9] = 2;
+    threw = false;
+    try { moved.merge(overlap); } catch (const invalid_argument&) { threw = true; }
+    if (!threw || moved.size() != 1 || overlap.size() != 1 || static_cast<long long>(overlap[9]) != 2) fail_test("map merge must reject duplicate keys");
 }
 `;
 }
@@ -1200,6 +1255,19 @@ int main() {
             else if (op == 6) { tree.assign(l, ${hi}, -7); for (int i = l; i < r; ++i) brute[i] = -7; }
             else { tree[l] = tree[r - 1]; brute[l] = brute[r - 1]; }
         }
+        if (step % 17 == 0) {
+            int cut = rng() % (brute.size() + 1);
+            auto tail = tree.split(cut);
+            if (tree.size() != cut || tail.size() != int(brute.size()) - cut) fail_test("array split size");
+            if (vector<long long>(tree.begin(), tree.end()) != vector<long long>(brute.begin(), brute.begin() + cut) || vector<long long>(tail.begin(), tail.end()) != vector<long long>(brute.begin() + cut, brute.end())) fail_test("array split contents");
+            if (cut && !tail.empty()) {
+                long long first = tail[0];
+                tree[0] += 1; brute[0] += 1;
+                if (static_cast<long long>(tail[0]) != first) fail_test("split trees share mutable nodes");
+            }
+            tree.merge(tail);
+            if (!tail.empty()) fail_test("array merge must consume rhs");
+        }
         const DynamicArray& c = tree;
         if (tree.size() != int(brute.size()) || vector<long long>(c.begin(), c.end()) != brute) fail_test("array wrapper contents");
         for (int i = 0; i < tree.size(); ++i) if (c[i] != brute[i]) fail_test("array subscript");
@@ -1214,12 +1282,79 @@ int main() {
     if (!tree.empty() || moved.size() != int(brute.size())) fail_test("array move");
     moved.clear(); moved.push_back(1); moved.push_front(2);
     if (moved.pop_back() != 1 || moved.pop_front() != 2 || !moved.empty()) fail_test("array deque operations");
+    moved.merge(DynamicArray{4, 5});
+    if (moved.size() != 2 || static_cast<long long>(moved[1]) != 5) fail_test("array temporary merge");
+    for (int cut : {-1, 3}) {
+        threw = false;
+        try { (void)moved.split(cut); } catch (const out_of_range&) { threw = true; }
+        if (!threw || moved.size() != 2) fail_test("array split bounds");
+    }
+    threw = false;
+    try { moved.merge(moved); } catch (const invalid_argument&) { threw = true; }
+    if (!threw || moved.size() != 2) fail_test("array self merge");
 }
 `;
 }
 
 function pointerApiCases() {
   const cases = [];
+  for (const array_storage of [false, true]) {
+    for (const safe_merge_plus of [false, true]) {
+      cases.push({
+        name: `api-strong-mixed-${array_storage ? 'array' : 'heap'}-${safe_merge_plus ? 'safe-plus' : 'named-only'}`,
+        config: configFor(['augmented_ptr', 'safe_merge_option', 'size_option', 'par_option'], { key_type: 'int', array_storage, safe_merge_plus }),
+        body: `
+int main() {
+    ptr a = ptr::make(1);
+    const strong_ptr b = ptr::make(2);
+    ptr n = a + b;
+    if (bool(a) != ${!safe_merge_plus} || !b || sz(n) != 2) fail_test("mixed ptr + strong_ptr");
+    delete n;
+    strong_ptr c = ptr::make(3);
+    ptr d = ptr::make(4);
+    n = c + d;
+    if (!c || bool(d) != ${!safe_merge_plus} || sz(n) != 2) fail_test("mixed strong_ptr + ptr");
+    delete n;
+    c = ptr::make(5);
+    strong_ptr e = ptr::make(6);
+    n = c + e;
+    if (!c || !e || sz(n) != 2) fail_test("strong + must work without ordinary + selected");
+    delete n;
+    c = ptr::make(7); d = ptr::make(8);
+    c += d;
+    if (!c || bool(d) != ${!safe_merge_plus} || sz(ptr(c)) != 2) fail_test("strong += ptr");
+    delete c.get();
+    a = ptr::make(9); e = ptr::make(10);
+    a += e;
+    if (!e || sz(a) != 2) fail_test("ptr += strong");
+    delete a;
+    c = ptr::make(11);
+    n = c + new Node(12);
+    if (!c || sz(n) != 2) fail_test("strong + raw node");
+    delete n;
+    c = ptr::make(13);
+    n = nullptr + c;
+    if (n != ptr(c)) fail_test("null + strong");
+    n = c + nullptr;
+    if (!c || sz(n) != 1) fail_test("strong + null operands");
+    delete n;
+}
+`,
+      });
+    }
+    cases.push({
+      name: `api-dynamic-index-forced-${array_storage ? 'array' : 'heap'}`,
+      config: configFor([], { wrapper_type: 'dynamic_array', subscript: 'key', key_type: 'int', array_storage }),
+      body: `
+int main() {
+    ptr n = nullptr;
+    for (int i = 0; i < 5; ++i) n = merge(n, ptr::make(100 + i, Value::make(i)));
+    if (!n[2] || n[2]->val.sum != 2 || sz(n) != 5) fail_test("DynamicArray must force pointer subscripting by index");
+    delete n;
+}
+`,
+    });
+  }
   for (const array_storage of [false, true]) {
     cases.push({
       name: `api-strong-${array_storage ? "array" : "heap"}`,

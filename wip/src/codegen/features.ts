@@ -14,7 +14,7 @@ export interface FeatureMeta {
 export const features: FeatureMeta[] = [
   // Misc
   { key: "signature", label: "Include site tag (pls)", section: "Misc" },
-  { key: "comments", label: "Include comments", section: "Misc" },
+  { key: "comments", label: "Include comments", section: "Misc", tooltip: "Include explanatory algorithm comments. Short container split/merge ownership contracts are always emitted." },
   { key: "template", label: "Include template (for testing)", section: "Misc" },
   { key: "persistent", label: "Persistent treap", section: "Misc", tooltip: "Keeps old versions valid by cloning before mutation. Requires randomized size merge and excludes parent pointers/iterators because shared nodes cannot have version-specific parents. Array storage is recommended for faster persistent allocation." },
   // Namespaces & Typedefs
@@ -34,7 +34,7 @@ export const features: FeatureMeta[] = [
     { value: "inc exc", label: "inc exc" },
     { value: "inc inc", label: "inc inc" },
   ] },
-  { key: "wrapper_type", label: "Container interface", section: "Wrapper", type: "select", tooltip: "Optional root-owning, move-only containers: TreapSet, TreapMultiset, TreapMap, or DynamicArray. Map/array values use the selected numeric value type; subscript writes repair aggregates. Iteration is read-only. Array-storage nodes remain in the shared arena after erase/clear. Wrappers do not support persistence.", options: [
+  { key: "wrapper_type", label: "Container interface", section: "Wrapper", type: "select", tooltip: "Optional root-owning, move-only containers: TreapSet, TreapMultiset, TreapMap, or DynamicArray. Map/array values use the selected numeric value type; subscript writes repair aggregates. Iteration is read-only. split(cut) keeps the left part and returns the right; merge(rhs) appends and empties rhs. Ordered containers require separated key ranges (equal boundaries allowed only for multiset). Array-storage nodes remain in the shared arena after erase/clear. Wrappers do not support persistence.", options: [
     { value: "none", label: "Raw functions" },
     { value: "set", label: "TreapSet" },
     { value: "multiset", label: "TreapMultiset" },
@@ -43,7 +43,7 @@ export const features: FeatureMeta[] = [
   ] },
   // Pointer / Iterators
   { key: "augmented_ptr", label: "Augmented pointer (iterable ptr)", section: "Pointer/Iterators", tooltip: "Enable succ for forward range iteration and std::next. Predecessor traversal starts at mx(root), not end(); a null end pointer cannot remember a tree." },
-  { key: "subscript", label: "Pointer operator[]", section: "Pointer/Iterators", type: "select", subOptionOf: "augmented_ptr", tooltip: "Returns a node handle by zero-based index or key. Requires values. Mutate values through modify/modifyi to keep aggregates valid.", options: [
+  { key: "subscript", label: "Pointer operator[]", section: "Pointer/Iterators", type: "select", subOptionOf: "augmented_ptr", tooltip: "Returns a node handle by zero-based index or key. Requires values. DynamicArray fixes this to Index. Mutate values through modify/modifyi to keep aggregates valid.", options: [
     { value: "none", label: "None" },
     { value: "index", label: "Index" },
     { value: "key", label: "Key" },
@@ -256,6 +256,10 @@ export const edges: Array<[string, string]> = [
   ["pred", "par_option"],
 ];
 
+export function forcedOptions(cfg: Record<string, boolean|string>): Record<string, boolean|string> {
+  return cfg.wrapper_type === 'dynamic_array' ? { subscript: 'index' } : {};
+}
+
 export function dependencyEdges(cfg: Record<string, boolean|string>): Array<[string, string]> {
   const result = [...edges];
   if (cfg.subscript === 'index') result.push(['subscript', 'findi_option']);
@@ -265,9 +269,9 @@ export function dependencyEdges(cfg: Record<string, boolean|string>): Array<[str
   }
   const wrapper = cfg.wrapper_type;
   if (wrapper === 'dynamic_array') {
-    for (const dep of ['merge_option', 'insi_option', 'deli_option', 'modi_option', 'range_query_index']) result.push(['wrapper_type', dep]);
+    for (const dep of ['merge_option', 'insi_option', 'deli_option', 'modi_option', 'range_query_index', 'subscript']) result.push(['wrapper_type', dep]);
   } else if (wrapper === 'set' || wrapper === 'multiset' || wrapper === 'map') {
-    for (const dep of ['key_type', 'ins_option', 'del_option', 'del_all_option', 'find_option', 'lower_bound_option', 'upper_bound_option']) result.push(['wrapper_type', dep]);
+    for (const dep of ['key_type', 'ins_option', 'del_option', 'del_all_option', 'find_option', 'lower_bound_option', 'upper_bound_option', 'max_option']) result.push(['wrapper_type', dep]);
     if (wrapper === 'map') result.push(['wrapper_type', 'mod_option'], ['wrapper_type', 'range_query_key']);
   }
   if (wrapper === 'map' || wrapper === 'dynamic_array') {
