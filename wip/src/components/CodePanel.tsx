@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { diffLines, highlightCpp, type DiffLine, type Token } from '../uiModel';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { diffLines, diffScrollTarget, highlightCpp, type DiffLine, type Token } from '../uiModel';
 import { Dialog } from './Dialog';
 import { Icon } from './Icon';
 
@@ -16,6 +16,11 @@ export function CodePanel({ code, previous, onClearChanges }: { code: string; pr
   const panel = useRef<HTMLElement>(null);
   const expandButton = useRef<HTMLButtonElement>(null);
   const scrollPosition = useRef({ top: 0, left: 0 });
+  const scrollElement = useRef<HTMLDivElement | null>(null);
+  const attachScroll = useCallback((element: HTMLDivElement | null) => {
+    scrollElement.current = element;
+    if (element) { element.scrollTop = scrollPosition.current.top; element.scrollLeft = scrollPosition.current.left; }
+  }, []);
   const wasExpanded = useRef(false);
   const [mode, setMode] = useState<'none' | 'dialog' | 'native'>('none');
   const [showChanges, setShowChanges] = useState(true);
@@ -33,6 +38,18 @@ export function CodePanel({ code, previous, onClearChanges }: { code: string; pr
   const rows: DiffLine[] = showChanges ? changes : code.split('\n').map((text, i) => ({ kind: 'equal', text, newLine: i + 1 }));
   const added = changes.filter(row => row.kind === 'add').length;
   const removed = changes.filter(row => row.kind === 'remove').length;
+
+  useEffect(() => {
+    if (!showChanges) return;
+    const frame = requestAnimationFrame(() => {
+      const element = scrollElement.current;
+      if (!element || activeBatch.current !== batch) return;
+      const changed = Array.from(element.querySelectorAll<HTMLElement>('.diff-add, .diff-remove')).map(line => line.getBoundingClientRect());
+      const target = diffScrollTarget(element.getBoundingClientRect().top, element.clientHeight, element.scrollTop, changed);
+      if (target !== null) { element.scrollTop = target; scrollPosition.current.top = element.scrollTop; }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [batch, showChanges, mode]);
 
   useEffect(() => {
     if (code === previous) return;
@@ -105,7 +122,7 @@ export function CodePanel({ code, previous, onClearChanges }: { code: string; pr
       {(added > 0 || removed > 0) && <button className="text-button" onClick={onClearChanges}>Clear changes</button>}
     </div>
     <div className="code-scroll" tabIndex={0} aria-label="Scrollable C++ source" style={{ fontSize }}
-      ref={element => { if (element) { element.scrollTop = scrollPosition.current.top; element.scrollLeft = scrollPosition.current.left; } }}
+      ref={attachScroll}
       onScroll={event => { scrollPosition.current = { top: event.currentTarget.scrollTop, left: event.currentTarget.scrollLeft }; }}>
       <pre><code key={code}>{rows.map((row, i) => {
         const tokens = row.kind === 'remove' ? previousTokens[(row.oldLine ?? 1) - 1] : currentTokens[(row.newLine ?? 1) - 1];

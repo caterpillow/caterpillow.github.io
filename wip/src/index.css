@@ -72,19 +72,13 @@ svg { flex: none; }
 .section-columns { position: relative; min-width: 0; }
 .subsection-slot { position: absolute; top: 0; min-width: 0; container-type: inline-size; container-name: subsection; }
 .settings-group { min-width: 0; margin: 0; padding: 0; border: 0; }
-.availability-legend { display: flex; flex-wrap: wrap; gap: 14px; margin: -7px 0 15px; color: var(--muted); font-size: 10px; }
-.availability-legend > span { display: inline-flex; align-items: center; gap: 5px; }
-.availability-legend i { width: 9px; height: 9px; border-radius: 3px; border: 1px solid var(--border); }
-.legend-on { background: var(--accent); border-color: var(--accent) !important; }
-.legend-off { background: white; }
-.legend-unavailable { background: #e9edf3; border-style: dashed !important; }
 .settings-group legend { font-size: 10px; letter-spacing: .085em; text-transform: uppercase; font-weight: 750; color: var(--muted); margin-bottom: 8px; padding: 0; }
 .feature-list { display: flex; flex-direction: column; gap: 6px; }
 .feature-card.is-on { border-color: #c1c6f1; }
 .feature-card.is-unavailable, .sub-option.is-unavailable { border-style: dashed; background: #eff2f7; }
-.is-unavailable > .feature-row > .feature-label { color: #8a95a8; cursor: not-allowed; }
+.is-unavailable > .feature-row > .feature-label { color: #8a95a8; cursor: default; }
 .is-unavailable > .feature-row > input, .is-unavailable > .feature-row > select { opacity: .4; pointer-events: none; }
-.availability-label, .required-label { display: block; font-size: 9px; line-height: 1.3; font-weight: 500; margin-top: 1px; }
+.required-label { display: block; font-size: 9px; line-height: 1.3; font-weight: 500; margin-top: 1px; }
 .required-label { color: var(--accent); }
 .feature-row { touch-action: manipulation; }
 .feature-card { min-width: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
@@ -137,7 +131,7 @@ svg { flex: none; }
 .diff-add .change-marker { color: var(--add); }
 .diff-remove .change-marker { color: var(--remove); }
 @keyframes added-line { from { background-color: var(--add-bg); } to { background-color: transparent; } }
-@keyframes removed-line { from { opacity: 1; height: 1.6em; } to { opacity: 0; height: 0; } }
+@keyframes removed-line { from { opacity: 1; } to { opacity: 0; } }
 .tok-keyword { color: var(--keyword); }
 .tok-type { color: var(--type); }
 .tok-string { color: var(--string); }

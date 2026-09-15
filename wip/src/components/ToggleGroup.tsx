@@ -46,7 +46,7 @@ export function ToggleGroup({ groupName, features, config, setConfig, activate, 
       <div className={`feature-row ${feature.type === 'select' ? 'select-row' : ''}`} onDoubleClick={event => {
         if (blocked && !(event.target as HTMLElement).closest('button')) { event.preventDefault(); enable(); }
       }}>
-        <label className="feature-label" htmlFor={id}><span>{label}</span>{blocked && <small className="availability-label">Unavailable</small>}{locked && <small className="required-label">Required by DynamicArray</small>}</label>
+        <label className="feature-label" htmlFor={id}><span>{label}</span>{locked && <small className="required-label">Required by DynamicArray</small>}</label>
         {feature.type === 'select' ? <select id={id} disabled={blocked || locked} aria-label={feature.label} value={String(config[feature.key] ?? feature.options?.[0]?.value ?? '')} className="setting-select"
           aria-describedby={open ? `${id}-help` : undefined} onChange={event => setConfig({ ...config, [feature.key]: event.target.value }, feature.key)}>
           {feature.options?.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}

@@ -14,7 +14,7 @@ try {
     stdin: { contents: 'export * from "./src/uiModel"; export * from "./src/codegen/features"; export * from "./src/codegen/depsUtil";', resolveDir: root, loader: 'ts' },
     bundle: true, platform: 'node', format: 'cjs', outfile: bundle, logLevel: 'silent',
   });
-  const { diffLines, highlightCpp, clampRatio, settingsSection, SETTINGS_SECTIONS, features, partitionGroups, columnCount, createDefaultConfig, setFeature, setAvailableFeature, activateFeature, computeDisabled } = createRequire(import.meta.url)(bundle);
+  const { diffLines, highlightCpp, clampRatio, diffScrollTarget, settingsSection, SETTINGS_SECTIONS, features, partitionGroups, columnCount, createDefaultConfig, setFeature, setAvailableFeature, activateFeature, computeDisabled } = createRequire(import.meta.url)(bundle);
   const rows = diffLines('a\nx\na\nb', 'a\na\nb');
   assert.deepEqual(rows.map(r => r.kind), ['equal', 'remove', 'equal', 'equal']);
   assert.equal(rows[1].text, 'x');
@@ -23,6 +23,11 @@ try {
   assert.deepEqual(diffLines('a', 'a\nb').map(r => r.kind), ['equal', 'add']);
   assert.deepEqual(diffLines('    a', '\ta').map(r => r.kind), ['equal']);
   assert.deepEqual(diffLines('', ''), []);
+  assert.equal(diffScrollTarget(100, 300, 400, []), null);
+  assert.equal(diffScrollTarget(100, 300, 400, [{ top: 120, bottom: 140 }, { top: 900, bottom: 920 }]), null);
+  assert.equal(diffScrollTarget(100, 300, 400, [{ top: 500, bottom: 520 }]), 740);
+  assert.equal(diffScrollTarget(100, 300, 400, [{ top: 20, bottom: 40 }]), 260);
+  assert.equal(diffScrollTarget(100, 0, 400, [{ top: 500, bottom: 520 }]), null);
 
   let seed = 123;
   const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed; };

@@ -72,6 +72,12 @@ export function partitionGroups(heights: number[], count: number, gap = COLUMN_G
   return best === preferred ? result : result.sort((a, b) => (a[0] ?? Infinity) - (b[0] ?? Infinity));
 }
 
+export function diffScrollTarget(viewTop: number, viewHeight: number, scrollTop: number, changedLines: { top: number; bottom: number }[]): number | null {
+  if (viewHeight <= 0 || !changedLines.length || changedLines.some(line => line.bottom > viewTop && line.top < viewTop + viewHeight)) return null;
+  const context = Math.min(100, Math.max(32, viewHeight * 0.2));
+  return Math.max(0, scrollTop + changedLines[0].top - viewTop - context);
+}
+
 export interface DiffLine {
   kind: 'equal' | 'add' | 'remove';
   text: string;
@@ -163,7 +169,7 @@ export function diffLines(previous: string, current: string): DiffLine[] {
 export type TokenKind = 'text' | 'keyword' | 'type' | 'string' | 'number' | 'comment' | 'preprocessor' | 'function';
 export interface Token { text: string; kind: TokenKind }
 const keywords = new Set('auto class struct template typename using namespace const constexpr static if else while for return new delete nullptr true false operator friend public private protected inline noexcept throw try catch default case switch break continue do sizeof decltype alignas static_assert this virtual override final requires concept volatile unsigned signed'.split(' '));
-const types = new Set('int long double float bool char void short wchar_t size_t ptrdiff_t uintmax_t nullptr_t ll ptr strong_ptr'.split(' '));
+const types = new Set('int long double float bool char void short wchar_t size_t ptrdiff_t uintmax_t nullptr_t ll ptr weak_ptr'.split(' '));
 
 export function highlightCpp(source: string): Token[][] {
   const lines: Token[][] = [[]];
