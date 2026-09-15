@@ -41,8 +41,9 @@ export const features: FeatureMeta[] = [
     { value: "map", label: "TreapMap" },
     { value: "dynamic_array", label: "DynamicArray" },
   ] },
+  { key: "treap_safety", label: "Expensive safety checks", section: "Wrapper", tooltip: "Off by default. Adds traversal-based container join checks behind #ifdef treap_safety and emits #define treap_safety at the top. Comment out that define to remove their cost. Cheap bounds, end-iterator, and self-merge checks remain enabled." },
   // Pointer / Iterators
-  { key: "augmented_ptr", label: "Augmented pointer (iterable ptr)", section: "Pointer/Iterators", tooltip: "Enable succ for forward range iteration and std::next. Predecessor traversal starts at mx(root), not end(); a null end pointer cannot remember a tree." },
+  { key: "augmented_ptr", label: "Augmented pointer (iterable ptr)", section: "Pointer/Iterators", tooltip: "Enable succ for forward range iteration and pred for --. Decrementing end() throws; reverse traversal must start at an actual node. ptr::weak_ptr provides non-owning handles with safe merges without clashing with std::weak_ptr." },
   { key: "subscript", label: "Pointer operator[]", section: "Pointer/Iterators", type: "select", subOptionOf: "augmented_ptr", tooltip: "Returns a node handle by zero-based index or key. Requires values. DynamicArray fixes this to Index. Mutate values through modify/modifyi to keep aggregates valid.", options: [
     { value: "none", label: "None" },
     { value: "index", label: "Index" },
@@ -68,10 +69,10 @@ export const features: FeatureMeta[] = [
   // Merge options
   { key: "merge_option", label: "Include merge", section: "Core" },
   { key: "size_biased_merge", label: "Randomized size merge", section: "Core", tooltip: "Merge chooses the root proportional to subtree sizes instead of storing node priorities. Required for persistence." },
-  { key: "safe_merge_option", label: "Include safe merge", section: "Core", tooltip: "Clears ordinary ptr lvalues after merging. With augmented pointers, strong_ptr handles (including parent pointers) are not consumed. A strong_ptr is non-owning and does not survive node deletion." },
+  { key: "safe_merge_option", label: "Include safe merge", section: "Core", tooltip: "Clears ordinary ptr lvalues after merging. With augmented pointers, ptr::weak_ptr handles (including parent pointers) are not consumed. A ptr::weak_ptr is non-owning and does not survive node deletion." },
   { key: "n_merge_option", label: "Include n-way merge", section: "Core" },
   { key: "plus_merge_option", label: "Include + merge", section: "Core" },
-  { key: "safe_merge_plus", label: "Safe merge", section: "Core", subOptionOf: "plus_merge_option", tooltip: "Clears ordinary ptr lvalues after merging. With augmented pointers, strong_ptr handles (including parent pointers) are not consumed. A strong_ptr is non-owning and does not survive node deletion." },
+  { key: "safe_merge_plus", label: "Safe merge", section: "Core", subOptionOf: "plus_merge_option", tooltip: "Clears ordinary ptr lvalues after merging. With augmented pointers, ptr::weak_ptr handles (including parent pointers) are not consumed. A ptr::weak_ptr is non-owning and does not survive node deletion." },
   // Key type & split options
   { key: "key_type", label: "Choose key type", section: "Key/Index", type: "select", options: [
     { value: "none", label: "None" },
@@ -199,6 +200,7 @@ export const edges: Array<[string, string]> = [
   ["subscript_key_mode", "subscript"],
   ["wrapper_type", "augmented_ptr"],
   ["wrapper_type", "succ"],
+  ["wrapper_type", "pred"],
   ["wrapper_type", "findi_option"],
   ["wrapper_type", "size_option"],
   ["plus_merge_option", "merge_option"],
@@ -271,7 +273,8 @@ export function dependencyEdges(cfg: Record<string, boolean|string>): Array<[str
   if (wrapper === 'dynamic_array') {
     for (const dep of ['merge_option', 'insi_option', 'deli_option', 'modi_option', 'range_query_index', 'subscript']) result.push(['wrapper_type', dep]);
   } else if (wrapper === 'set' || wrapper === 'multiset' || wrapper === 'map') {
-    for (const dep of ['key_type', 'ins_option', 'del_option', 'del_all_option', 'find_option', 'lower_bound_option', 'upper_bound_option', 'max_option']) result.push(['wrapper_type', dep]);
+    for (const dep of ['key_type', 'ins_option', 'del_option', 'del_all_option', 'find_option', 'lower_bound_option', 'upper_bound_option']) result.push(['wrapper_type', dep]);
+    if (cfg.treap_safety) result.push(['wrapper_type', 'max_option']);
     if (wrapper === 'map') result.push(['wrapper_type', 'mod_option'], ['wrapper_type', 'range_query_key']);
   }
   if (wrapper === 'map' || wrapper === 'dynamic_array') {

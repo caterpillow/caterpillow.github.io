@@ -59,7 +59,7 @@ try {
 
   const stressTasks = selectedStress.map((testCase) => async () => {
     const code = generateTreapCode(derive(testCase.config));
-    const source = stressHarness(code, testCase.body);
+    const source = stressHarness(testCase.transform ? testCase.transform(code) : code, testCase.body);
     const bin = await compileCase(testCase.name, source);
     for (const seed of seeds) await runBinary(testCase.name, bin, testCase.timeoutMs ?? 6000, seed, testCase.config.persistent);
     return bin;
@@ -153,6 +153,14 @@ function assertGeneratorInvariants(generate) {
   assert.equal(deriveConfig(cfg).persistent, true);
   cfg.size_option = false;
   assert.equal(deriveConfig(cfg).persistent, false);
+  assert.equal(createDefaultConfig().treap_safety, false);
+  const fast = generate(configFor([], { wrapper_type: 'set' }));
+  assert(!fast.includes('#define treap_safety'));
+  assert(!fast.includes('merge requires ordered, separated key ranges'));
+  const checked = generate(configFor([], { wrapper_type: 'set', treap_safety: true }));
+  assert(checked.includes('#define treap_safety'));
+  assert(checked.includes('#ifdef treap_safety'));
+  assert(checked.includes('Cannot merge a container into itself'));
   const sequence = setFeature(createDefaultConfig(), 'wrapper_type', 'dynamic_array');
   assert.equal(sequence.subscript, 'index');
   assert.equal(setFeature(sequence, 'subscript', 'key').subscript, 'index');
@@ -1092,6 +1100,25 @@ int main() {
 }
 `,
   }];
+  cases.push({
+    name: 'wrapper-safety-define-disabled',
+    config: configFor([], { wrapper_type: 'set', treap_safety: true }),
+    transform: code => {
+      assert(code.includes('ptr last(ptr n) { return mx(n); }'));
+      return code.replace('#define treap_safety', '// #define treap_safety')
+        .replace('ptr last(ptr n) { return mx(n); }', 'ptr last(ptr) { throw std::logic_error("unexpected traversal check"); }');
+    },
+    body: `
+int main() {
+    TreapSet a{1, 2}, b{3, 4};
+    a.merge(b);
+    if (a.size() != 4 || !b.empty()) fail_test("disabled safety merge");
+    bool rejected = false;
+    try { a.merge(a); } catch (const invalid_argument&) { rejected = true; }
+    if (!rejected) fail_test("cheap checks must remain enabled");
+}
+`,
+  });
   for (const wrapper_type of ['set', 'multiset', 'map', 'dynamic_array']) {
     for (const array_storage of [false, true]) {
       for (const size_biased_merge of [false, true]) {
@@ -1099,7 +1126,7 @@ int main() {
         cases.push({
           name: `wrapper-${wrapper_type}-${array_storage ? 'array' : 'heap'}-${size_biased_merge ? 'size' : 'priority'}`,
           config: configFor(wrapper_type === 'map' ? ['key_sum', 'range_add', 'range_set', 'range_update_key'] : wrapper_type === 'dynamic_array' ? ['range_add', 'range_set', 'range_update_index', 'range_reverse_index', 'rot_option'] : [], {
-            wrapper_type, array_storage, size_biased_merge,
+            wrapper_type, array_storage, size_biased_merge, treap_safety: true,
             key_type: wrapper_type === 'dynamic_array' ? 'none' : 'long long',
             val_type: wrapper_type === 'set' || wrapper_type === 'multiset' ? 'none' : 'long long', range_type: rangeType,
           }),
@@ -1146,6 +1173,15 @@ int main() {
             if (!right.empty() || vector<long long>(tree.begin(), tree.end()) != expected || (first && &*tree.begin() != first)) fail_test("ordered split/merge ownership");
         }
     }
+    if (!tree.empty()) {
+        auto it = tree.kth(tree.size() - 1);
+        auto expected = brute.rbegin();
+        for (int i = tree.size(); i > 0; --i, --it, ++expected) if (*it != *expected) fail_test("wrapper decrement traversal");
+    }
+    bool endRejected = false;
+    auto end = tree.end();
+    try { end--; } catch (const out_of_range&) { endRejected = true; }
+    if (!endRejected) fail_test("wrapper decrement end must fail");
     ${name} moved(std::move(tree));
     if (!tree.empty() || moved.size() != int(brute.size())) fail_test("wrapper move construction");
     tree = std::move(moved);
@@ -1216,9 +1252,22 @@ int main() {
             if (!right.empty() || tree.size() != int(brute.size()) || tree.all().sum != before.sum) fail_test("map consuming merge");
         }
     }
+    if (tree.size() > 1) {
+        auto it = tree.kth(tree.size() - 1);
+        auto last = it--;
+        if (last->first <= it->first) fail_test("map decrement");
+    }
+    bool endRejected = false;
+    auto end = tree.end();
+    try { --end; } catch (const out_of_range&) { endRejected = true; }
+    if (!endRejected) fail_test("map decrement end");
     bool threw = false;
     try { (void)tree.at(LLONG_MAX); } catch (const out_of_range&) { threw = true; }
     if (!threw || tree.contains(LLONG_MAX)) fail_test("map at must not insert");
+    threw = false;
+    auto unchanged = tree.all();
+    try { tree.set(LLONG_MAX, 9); } catch (const out_of_range&) { threw = true; }
+    if (!threw || tree.contains(LLONG_MAX) || tree.all().sum != unchanged.sum || tree.all().ksum != unchanged.ksum) fail_test("single-pass set must reject missing keys");
     TreapMap moved = std::move(tree);
     if (!tree.empty() || moved.size() != int(brute.size())) fail_test("map move");
     moved.clear();
@@ -1274,9 +1323,23 @@ int main() {
         int r = brute.size();
         if (tree.query(0, ${hi}).sum != accumulate(brute.begin(), brute.end(), 0LL)) fail_test("array proxy aggregates");
     }
+    if (!tree.empty()) {
+        auto it = tree.kth(tree.size() - 1);
+        for (int i = tree.size() - 1; i >= 0; --i, --it) if (*it != brute[i]) fail_test("array decrement traversal");
+    }
+    bool endRejected = false;
+    auto end = tree.end();
+    try { --end; } catch (const out_of_range&) { endRejected = true; }
+    if (!endRejected) fail_test("array decrement end");
     bool threw = false;
     try { tree.at(-1) = 0; } catch (const out_of_range&) { threw = true; }
     if (!threw) fail_test("array bounds");
+    threw = false;
+    try { (void)tree.at(tree.size()); } catch (const out_of_range&) { threw = true; }
+    if (!threw) fail_test("array at must validate before proxy conversion");
+    threw = false;
+    try { tree.set(-1, 9); } catch (const out_of_range&) { threw = true; }
+    if (!threw) fail_test("single-pass array set bounds");
     DynamicArray moved{1, 2, 3};
     moved = std::move(tree);
     if (!tree.empty() || moved.size() != int(brute.size())) fail_test("array move");
@@ -1298,25 +1361,48 @@ int main() {
 
 function pointerApiCases() {
   const cases = [];
+  for (const array_storage of [false, true]) cases.push({
+    name: `api-decrement-${array_storage ? 'array' : 'heap'}`,
+    config: configFor(['augmented_ptr', 'succ', 'pred', 'merge_option', 'range_sum'], { array_storage }),
+    body: `
+int main() {
+    ptr t = merge(ptr::make(Value::make(3)), ptr::make(Value::make(7)));
+    ptr it = t.begin();
+    ++it;
+    ptr old = it--;
+    if (old->val.sum != 7 || it->val.sum != 3) fail_test("post-decrement iterator");
+    ++it; --it;
+    if (it->val.sum != 3) fail_test("pre-decrement iterator");
+    it = t.end();
+    bool rejected = false;
+    try { --it; } catch (const out_of_range&) { rejected = true; }
+    if (!rejected || it) fail_test("decrement end must fail without changing the iterator");
+    rejected = false;
+    try { it--; } catch (const out_of_range&) { rejected = true; }
+    if (!rejected) fail_test("post-decrement end must fail");
+    delete t;
+}
+`,
+  });
   for (const array_storage of [false, true]) {
     for (const safe_merge_plus of [false, true]) {
       cases.push({
-        name: `api-strong-mixed-${array_storage ? 'array' : 'heap'}-${safe_merge_plus ? 'safe-plus' : 'named-only'}`,
+        name: `api-weak-mixed-${array_storage ? 'array' : 'heap'}-${safe_merge_plus ? 'safe-plus' : 'named-only'}`,
         config: configFor(['augmented_ptr', 'safe_merge_option', 'size_option', 'par_option'], { key_type: 'int', array_storage, safe_merge_plus }),
         body: `
 int main() {
     ptr a = ptr::make(1);
-    const strong_ptr b = ptr::make(2);
+    const ptr::weak_ptr b = ptr::make(2);
     ptr n = a + b;
-    if (bool(a) != ${!safe_merge_plus} || !b || sz(n) != 2) fail_test("mixed ptr + strong_ptr");
+    if (bool(a) != ${!safe_merge_plus} || !b || sz(n) != 2) fail_test("mixed ptr + ptr::weak_ptr");
     delete n;
-    strong_ptr c = ptr::make(3);
+    ptr::weak_ptr c = ptr::make(3);
     ptr d = ptr::make(4);
     n = c + d;
-    if (!c || bool(d) != ${!safe_merge_plus} || sz(n) != 2) fail_test("mixed strong_ptr + ptr");
+    if (!c || bool(d) != ${!safe_merge_plus} || sz(n) != 2) fail_test("mixed ptr::weak_ptr + ptr");
     delete n;
     c = ptr::make(5);
-    strong_ptr e = ptr::make(6);
+    ptr::weak_ptr e = ptr::make(6);
     n = c + e;
     if (!c || !e || sz(n) != 2) fail_test("strong + must work without ordinary + selected");
     delete n;
@@ -1357,19 +1443,19 @@ int main() {
   }
   for (const array_storage of [false, true]) {
     cases.push({
-      name: `api-strong-${array_storage ? "array" : "heap"}`,
+      name: `api-weak-${array_storage ? "array" : "heap"}`,
       config: configFor(["safe_merge_option", "safe_merge_plus", "size_option", "par_option", "root_option", "order_option"], { key_type: "int", array_storage }),
       body: `
 int main() {
-    static_assert(sizeof(strong_ptr) == sizeof(ptr));
-    static_assert(!is_convertible_v<strong_ptr&, ptr&>);
-    static_assert(is_same_v<decltype(Node{}.par), strong_ptr>);
-    strong_ptr a = ptr::make(1), b = ptr::make(2);
+    static_assert(sizeof(ptr::weak_ptr) == sizeof(ptr));
+    static_assert(!is_convertible_v<ptr::weak_ptr&, ptr&>);
+    static_assert(is_same_v<decltype(Node{}.par), ptr::weak_ptr>);
+    ptr::weak_ptr a = ptr::make(1), b = ptr::make(2);
     Node* saved = a.get();
     ptr n = safe_merge(a, b);
     if (!a || !b || a.get() != saved || sz(n) != 2 || root(a) != n || order(b) != 1) fail_test("safe merge consumed a strong handle");
-    strong_ptr parent = b->par;
-    if (parent != b->par || a != ptr(a) || ptr(a) != a || strong_ptr{} != nullptr) fail_test("strong handle comparisons");
+    ptr::weak_ptr parent = b->par;
+    if (parent != b->par || a != ptr(a) || ptr(a) != a || ptr::weak_ptr{} != nullptr) fail_test("strong handle comparisons");
     ptr c = ptr::make(3);
     n = safe_merge(n, c);
     if (c || !a || !b || sz(n) != 3) fail_test("ordinary handles must still be consumed");
@@ -1445,7 +1531,27 @@ int main() {
 }
 
 function extendedRegressionCases() {
-  const cases = [];
+  const cases = [{
+    name: 'regression-persistent-covered-allocation',
+    config: configFor(['persistent', 'array_storage', 'range_sum', 'range_add', 'range_update_index', 'range_query_index', 'merge_option']),
+    body: `
+int main() {
+    ptr tree = nullptr;
+    for (int i = 0; i < 16; ++i) tree = merge(tree, ptr::make(Value::make(1)));
+    ptr old = tree;
+    int before = node_cnt;
+    Lazy tag = lid; tag.val = 2;
+    updi(tree, 0, 16, tag);
+    if (node_cnt != before + 1) fail_test("covered update should clone only its root");
+    before = node_cnt;
+    if (queryi(tree, 0, 16).sum != 48 || node_cnt != before) fail_test("covered read must not clone or push");
+    updi(tree, 0, 16, tag);
+    if (node_cnt != before + 1) fail_test("covered update must compose without pushing the previous tag");
+    before = node_cnt;
+    if (queryi(tree, 0, 16).sum != 80 || queryi(old, 0, 16).sum != 16 || node_cnt != before) fail_test("covered persistent snapshots");
+}
+`,
+  }];
   for (const type of ["int", "long long"]) {
     cases.push({
       name: `regression-extrema-${type.replace(" ", "-")}`,

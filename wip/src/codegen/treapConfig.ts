@@ -8,7 +8,7 @@ function usesAugmentedPtr(cfg: TreapConfig) {
   return !!(cfg.augmented_ptr || cfg.array_storage);
 }
 
-function usesStrongPtr(cfg: TreapConfig) {
+function usesWeakPtr(cfg: TreapConfig) {
   return usesAugmentedPtr(cfg) && !!(cfg.safe_merge_option || cfg.safe_merge_plus);
 }
 
@@ -92,6 +92,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     if (usesAugmentedPtr(cfg)) {
       let s = '';
       s += 'struct ptr {\n';
+      if (usesWeakPtr(cfg)) s += '    class weak_ptr;\n';
       if (cfg.succ) {
         s += '    using iterator_category = std::forward_iterator_tag;\n';
         s += '    using value_type = Node;\n';
@@ -140,8 +141,8 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
         s += '    ptr operator++(int) { return std::exchange(*this, succ(*this)); }\n';
       }
       if (cfg.pred) {
-        s += '    ptr &operator--() { return *this = pred(*this); }\n';
-        s += '    ptr operator--(int) { return std::exchange(*this, pred(*this)); }\n';
+        s += '    ptr &operator--() { if (!*this) throw std::out_of_range("Cannot decrement end()"); return *this = pred(*this); }\n';
+        s += '    ptr operator--(int) { ptr old = *this; --*this; return old; }\n';
       }
       if (cfg.plus_merge_option) {
         s += '\n';
@@ -165,17 +166,17 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     return '';
   },
 
-  strongPtrType: (cfg) => {
-    if (!usesStrongPtr(cfg)) return '';
-    let s = 'class strong_ptr {\n';
+  weakPtrType: (cfg) => {
+    if (!usesWeakPtr(cfg)) return '';
+    let s = 'class ptr::weak_ptr {\n';
     s += '    ptr p;\n';
     s += 'public:\n';
-    s += '    strong_ptr(std::nullptr_t = nullptr) : p(nullptr) {}\n';
-    s += '    strong_ptr(ptr n) : p(n) {}\n';
-    s += '    strong_ptr(Node *n) : p(n) {}\n';
-    s += '    strong_ptr &operator=(ptr n) { p = n; return *this; }\n';
-    s += '    strong_ptr &operator=(Node *n) { p = n; return *this; }\n';
-    s += '    strong_ptr &operator=(std::nullptr_t) { p = nullptr; return *this; }\n';
+    s += '    weak_ptr(std::nullptr_t = nullptr) : p(nullptr) {}\n';
+    s += '    weak_ptr(ptr n) : p(n) {}\n';
+    s += '    weak_ptr(Node *n) : p(n) {}\n';
+    s += '    weak_ptr &operator=(ptr n) { p = n; return *this; }\n';
+    s += '    weak_ptr &operator=(Node *n) { p = n; return *this; }\n';
+    s += '    weak_ptr &operator=(std::nullptr_t) { p = nullptr; return *this; }\n';
     s += '    operator ptr() const { return p; }\n';
     s += '    explicit operator bool() const { return bool(p); }\n';
     s += '    Node *get() const { return p.get(); }\n';
@@ -183,13 +184,13 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     s += '    Node &operator*() const { return *p; }\n';
     s += '    bool operator==(std::nullptr_t) const { return p == nullptr; }\n';
     s += '    bool operator!=(std::nullptr_t) const { return p != nullptr; }\n';
-    s += '    bool operator==(strong_ptr n) const { return p == n.p; }\n';
-    s += '    bool operator!=(strong_ptr n) const { return p != n.p; }\n';
-    s += '    friend bool operator==(strong_ptr a, ptr b) { return a.p == b; }\n';
-    s += '    friend bool operator==(ptr a, strong_ptr b) { return a == b.p; }\n';
-    s += '    friend bool operator!=(strong_ptr a, ptr b) { return a.p != b; }\n';
-    s += '    friend bool operator!=(ptr a, strong_ptr b) { return a != b.p; }\n';
-    s += '    template<class L, class R, std::enable_if_t<(std::is_same_v<std::decay_t<L>, strong_ptr> || std::is_same_v<std::decay_t<R>, strong_ptr>) && std::is_convertible_v<L, ptr> && std::is_convertible_v<R, ptr>, int> = 0>\n';
+    s += '    bool operator==(weak_ptr n) const { return p == n.p; }\n';
+    s += '    bool operator!=(weak_ptr n) const { return p != n.p; }\n';
+    s += '    friend bool operator==(weak_ptr a, ptr b) { return a.p == b; }\n';
+    s += '    friend bool operator==(ptr a, weak_ptr b) { return a == b.p; }\n';
+    s += '    friend bool operator!=(weak_ptr a, ptr b) { return a.p != b; }\n';
+    s += '    friend bool operator!=(ptr a, weak_ptr b) { return a != b.p; }\n';
+    s += '    template<class L, class R, std::enable_if_t<(std::is_same_v<std::decay_t<L>, weak_ptr> || std::is_same_v<std::decay_t<R>, weak_ptr>) && std::is_convertible_v<L, ptr> && std::is_convertible_v<R, ptr>, int> = 0>\n';
     s += '    friend ptr operator+(L&& lhs, R&& rhs) {\n';
     s += '        ptr res = merge(ptr(lhs), ptr(rhs));\n';
     if (cfg.safe_merge_plus) {
@@ -198,10 +199,10 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     }
     s += '        return res;\n';
     s += '    }\n';
-    s += '    friend ptr& operator+=(ptr& lhs, strong_ptr rhs) { return lhs = merge(lhs, ptr(rhs)); }\n';
+    s += '    friend ptr& operator+=(ptr& lhs, weak_ptr rhs) { return lhs = merge(lhs, ptr(rhs)); }\n';
     s += '    template<class R, std::enable_if_t<std::is_convertible_v<R, ptr>, int> = 0>\n';
-    s += '    strong_ptr& operator+=(R&& rhs) { p = *this + std::forward<R>(rhs); return *this; }\n';
-    s += '};\n\n';
+    s += '    weak_ptr& operator+=(R&& rhs) { p = *this + std::forward<R>(rhs); return *this; }\n';
+    s += '};\n\nusing weak_ptr = ptr::weak_ptr;\n\n';
     return s;
   },
 
@@ -392,9 +393,9 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
 
     // Pointers
     const ptrNames: string[] = ["l", "r"];
-    if (cfg.par_option && !usesStrongPtr(cfg)) ptrNames.push("par");
+    if (cfg.par_option && !usesWeakPtr(cfg)) ptrNames.push("par");
     out += `    ptr ${ptrNames.join(", ")};\n`;
-    if (cfg.par_option && usesStrongPtr(cfg)) out += '    strong_ptr par;\n';
+    if (cfg.par_option && usesWeakPtr(cfg)) out += '    ptr::weak_ptr par;\n';
     out += '\n';
 
     // Constructors
@@ -495,16 +496,10 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     s += persistScope(cfg);
     if (cfg.par_option) s += '    if (l) l->par = nullptr;\n    if (r) r->par = nullptr;\n';
     s += '    if (!l || !r) return l ? l : r;\n';
-    if (cfg.persistent) s += '    clone(l), clone(r);\n';
-    if (cfg.push) s += '    push(l), push(r);\n';
-    if (usesSizeBiasedMerge(cfg)) {
-      s += '    if (std::uniform_int_distribution<int>(1, sz(l) + sz(r))(mt) <= sz(l))\n';
-      s += `        return l->r = merge(l->r, r), ${h.pull('l')};\n`;
-      s += `    else\n        return r->l = merge(l, r->l), ${h.pull('r')};\n`;
-    } else {
-      s += `    if (l->pri > r->pri)\n        return l->r = merge(l->r, r), ${h.pull('l')};\n`;
-      s += `    else\n        return r->l = merge(l, r->l), ${h.pull('r')};\n`;
-    }
+    const prepare = (n: string) => `${cfg.persistent ? `clone(${n}), ` : ''}${cfg.push ? `push(${n}), ` : ''}`;
+    const condition = usesSizeBiasedMerge(cfg) ? 'std::uniform_int_distribution<int>(1, sz(l) + sz(r))(mt) <= sz(l)' : 'l->pri > r->pri';
+    s += `    if (${condition})\n        return ${prepare('l')}l->r = merge(l->r, r), ${h.pull('l')};\n`;
+    s += `    else\n        return ${prepare('r')}r->l = merge(l, r->l), ${h.pull('r')};\n`;
     s += '}\n\n';
     return s;
   },
@@ -1058,12 +1053,12 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     s += '    if (!n || lo >= hi || lazy.empty()) return;\n';
     if (cfg.range_reverse_key || cfg.range_reverse_index) s += '    if (lazy.rev) throw std::invalid_argument("Use reverse/reversei for range reversal");\n';
     if (cfg.treap_beats) s += '    if (n->agg.can_break(lazy)) return;\n';
-    if (cfg.persistent) s += '    clone(n);\n';
-    if (cfg.push) s += '    push(n);\n';
     s += `    if (lo == 0 && n->sz == hi${cfg.treap_beats ? ' && n->agg.can_tag(lazy, sz(n))' : ''}) {\n`;
     s += '        apply(n, lazy);\n';
     s += '        return;\n';
     s += '    }\n';
+    if (cfg.persistent) s += '    clone(n);\n';
+    if (cfg.push) s += '    push(n);\n';
     if (cfg.enable_value || cfg.key_add || cfg.key_set) {
       s += '    if (lo <= sz(n->l) && sz(n->l) < hi) {\n';
       if (cfg.enable_value) s += `        n->val.upd(lazy${cfg.size_option ? ', 1' : ''});\n`;
@@ -1107,9 +1102,9 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     if (cfg.persistent && cfg.push) s += persistScope(cfg);
     s += '    lo = std::max(lo, 0), hi = std::min(hi, sz(n));\n';
     s += '    if (!n || lo >= hi) return vid;\n';
+    s += '    if (lo <= 0 && sz(n) <= hi) return n->agg;\n';
     if (cfg.persistent && cfg.push) s += '    clone(n);\n';
     if (cfg.push) s += '    push(n);\n';
-    s += '    if (lo <= 0 && sz(n) <= hi) return n->agg;\n';
     s += `    return ${fn}(n->l, lo, hi) + (lo <= sz(n->l) && sz(n->l) < hi ? n->val : vid) + ${fn}(n->r, lo - 1 - sz(n->l), hi - 1 - sz(n->l));\n`;
     s += '}\n\n';
     if (!incExc) {
@@ -1314,7 +1309,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
 // Unified, stable total order (no duplicates) for all blocks
 const ORDER = [
   'intro', 'comment',
-  'forwardDecls', 'ptrType', 'strongPtrType', 'partitionConst',
+  'forwardDecls', 'ptrType', 'weakPtrType', 'partitionConst',
   'lazyStruct', 'valueStruct',
   'vidConst', 'lidConst', 'beatsTagHelpers',
   'nodeStruct',
@@ -1348,6 +1343,7 @@ export function generateTreapCode(cfg: TreapConfig): string {
     const indented = code.split('\n').map(line => '    ' + line).join('\n');
     code = 'namespace Treap {\n\n' + indented + '\n\n}\n\nusing namespace Treap;\n\n';
   }
+  if (cfg.treap_safety) code = '#define treap_safety\n\n' + code;
   if (cfg.template) {
     let prefix = '#include <bits/stdc++.h>\n\n';
     if (cfg.use_namespace_std) prefix += 'using namespace std;\n';

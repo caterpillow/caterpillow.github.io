@@ -22,11 +22,12 @@ export function generateWrapper(cfg: TreapConfig): string {
   code += 'int size(ptr n) { return sz(n); }\n';
   code += 'ptr first(ptr n) { return mn(n); }\n';
   code += 'ptr next(ptr n) { return succ(n); }\n';
+  code += 'ptr previous(ptr n) { return pred(n); }\n';
   code += 'ptr at_index(ptr n, int i) { return findi(n, i); }\n';
   code += 'ptr join(ptr l, ptr r) { return merge(l, r); }\n';
   code += `void divide(ptr& n, ${index} cut, ptr& right) { auto parts = ${array ? 'spliti' : 'split'}(n, cut); n = parts.first; right = parts.second; }\n`;
   if (!array) {
-    code += 'ptr last(ptr n) { return mx(n); }\n';
+    if (cfg.treap_safety) code += 'ptr last(ptr n) { return mx(n); }\n';
     code += `ptr lookup(ptr n, ${key} key) { return find(n, key); }\n`;
     code += 'void insert_key(ptr& n, ptr it) { ins(n, it); }\n';
     code += `ptr remove_key(ptr& n, ${key} key) { return del(n, key); }\n`;
@@ -43,9 +44,9 @@ export function generateWrapper(cfg: TreapConfig): string {
     if (cfg.rot_option) code += 'void rotate_to(ptr& n, int i) { rotate(n, i); }\n';
   }
   if (numeric) {
-    code += `void write(ptr& n, ${index} at, ${scalar} value) {\n    ${array ? 'modifyi' : 'modify'}(n, at, [&](ptr it) {\n        it->val = Value::make(value);\n`;
+    code += `bool write(ptr& n, ${index} at, ${scalar} value) {\n    bool found = false;\n    ${array ? 'modifyi' : 'modify'}(n, at, [&](ptr it) {\n        found = true;\n        it->val = Value::make(value);\n`;
     if (cfg.key_sum) code += '        it->val.ksum = it->key;\n';
-    code += '    });\n}\n';
+    code += '    });\n    return found;\n}\n';
   }
   if (cfg.range_agg) code += 'Value aggregate(ptr n) { return agg(n); }\n';
   if (rangeQuery) code += `Value query_range(ptr& n, ${index} l, ${index} r) { return ${array ? 'queryi' : 'query'}(n, l, r); }\n`;
@@ -80,10 +81,12 @@ export function generateWrapper(cfg: TreapConfig): string {
   code += `        ${name} right;\n        wrapper_ops::divide(${root}, cut, right.${root});\n        return right;\n    }\n`;
   code += `    // Append rhs and empty it; ${array ? 'no node copies' : `require max(*this) ${multi ? '<=' : '<'} min(rhs)`}; self-merge is invalid.\n`;
   code += `    ${name}& merge(${name}& rhs) {\n        if (this == &rhs) throw std::invalid_argument("Cannot merge a container into itself");\n`;
-  if (!array) {
+  if (!array && cfg.treap_safety) {
     const last = `wrapper_ops::last(${root})->key`, first = `wrapper_ops::first(rhs.${root})->key`;
+    code += '#ifdef treap_safety\n';
     code += `        if (!empty() && !rhs.empty() && ${multi ? `(${first} < ${last})` : `!(${last} < ${first})`})\n`;
     code += '            throw std::invalid_argument("merge requires ordered, separated key ranges");\n';
+    code += '#endif\n';
   }
   code += `        ${root} = wrapper_ops::join(${root}, rhs.${root});\n        rhs.${root} = nullptr;\n        return *this;\n    }\n`;
   code += '    // Append a temporary/moved rhs using the same ordering and ownership rules.\n';
@@ -99,6 +102,8 @@ export function generateWrapper(cfg: TreapConfig): string {
   code += `        pointer operator->() const { return ${numeric ? '{**this}' : '&n->key'}; }\n`;
   code += '        const_iterator& operator++() { n = wrapper_ops::next(n); return *this; }\n';
   code += '        const_iterator operator++(int) { auto old = *this; ++*this; return old; }\n';
+  code += '        const_iterator& operator--() { if (!n) throw std::out_of_range("Cannot decrement end()"); n = wrapper_ops::previous(n); return *this; }\n';
+  code += '        const_iterator operator--(int) { auto old = *this; --*this; return old; }\n';
   code += '        bool operator==(const_iterator other) const { return n == other.n; }\n        bool operator!=(const_iterator other) const { return n != other.n; }\n    };\n';
   code += '    using iterator = const_iterator;\n';
   code += `    iterator begin() const { return wrapper_ops::first(${root}); }\n    iterator end() const { return {}; }\n`;
@@ -113,13 +118,13 @@ export function generateWrapper(cfg: TreapConfig): string {
     code += `        reference& operator-=(${scalarName} value) { return *this = static_cast<${scalarName}>(*this) - value; }\n`;
     code += `        reference& operator++() { return *this += 1; }\n        ${scalarName} operator++(int) { ${scalarName} old = *this; ++*this; return old; }\n`;
     code += `        reference& operator--() { return *this -= 1; }\n        ${scalarName} operator--(int) { ${scalarName} old = *this; --*this; return old; }\n    };\n`;
-    code += `    reference at(${index} i) { (void)read(i); return {*this, i}; }\n    ${scalarName} at(${index} i) const { return read(i); }\n`;
-    code += `    void set(${index} i, ${scalarName} value) { (void)read(i); wrapper_ops::write(${root}, i, value); }\n`;
+    code += `    reference at(${index} i) { ${array ? 'if (i < 0 || i >= size()) throw std::out_of_range("DynamicArray::at");' : '(void)read(i);'} return {*this, i}; }\n    ${scalarName} at(${index} i) const { return read(i); }\n`;
+    code += `    void set(${index} i, ${scalarName} value) { if (!wrapper_ops::write(${root}, i, value)) throw std::out_of_range("${name}::at"); }\n`;
   }
   if (!array) {
     code += `    iterator find(key_type key) const { return wrapper_ops::lookup(${root}, key); }\n`;
     code += `    bool contains(key_type key) const { return bool(wrapper_ops::lookup(${root}, key)); }\n`;
-    code += `    int count(key_type key) const { return wrapper_ops::rank(${root}, key, true) - wrapper_ops::rank(${root}, key); }\n`;
+    code += `    int count(key_type key) const { return ${multi ? `wrapper_ops::rank(${root}, key, true) - wrapper_ops::rank(${root}, key)` : 'contains(key)'}; }\n`;
     code += `    int order_of_key(key_type key) const { return wrapper_ops::rank(${root}, key); }\n`;
     code += `    iterator lower_bound(key_type key) const { return wrapper_ops::lower(${root}, key); }\n`;
     code += `    iterator upper_bound(key_type key) const { return wrapper_ops::upper(${root}, key); }\n`;
