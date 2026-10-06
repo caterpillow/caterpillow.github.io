@@ -8,7 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const distDir = path.join(__dirname, 'dist');
+const distDir = path.resolve(__dirname, process.env.BYOT_DIST_DIR || 'dist');
 const outputDir = path.join(__dirname, '..', 'wip');
 const outputFile = path.join(outputDir, 'byot.html');
 const assetsDir = path.join(outputDir, 'assets');
@@ -36,7 +36,7 @@ console.log(`✅ Created ${outputFile}`);
 const distAssetsDir = path.join(distDir, 'assets');
 if (fs.existsSync(distAssetsDir)) {
   // Remove old assets if they exist
-  if (fs.existsSync(assetsDir)) {
+  if (fs.existsSync(assetsDir) && process.argv.includes('--clean-assets')) {
     fs.rmSync(assetsDir, { recursive: true, force: true });
   }
   
