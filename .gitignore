@@ -14,7 +14,10 @@ build/
 wip-deploy/
 *.local
 
-# Allow wip/byot.html and wip/assets/ (the built page we want to serve)
+# Published BYOT pages, bundles, and compatibility assets
+!byot.html
+!byot2.html
+!assets/
 !wip/byot.html
 !wip/assets/
 
@@ -108,4 +111,3 @@ temp/
 
 # Local Netlify folder
 .netlify
-

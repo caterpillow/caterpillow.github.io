@@ -10,12 +10,12 @@
 
 2. **Commit and push:**
    ```bash
-   git add wip/byot.html wip/assets/
+   git add ../byot.html ../byot2.html ../assets/ byot.html
    git commit -m "Update BYOT page"
    git push
    ```
 
-3. **Wait 1-2 minutes** and your changes will be live at: https://caterpillow.github.io/wip/byot.html
+3. After GitHub Pages finishes deploying, your changes will be live at: https://caterpillow.github.io/byot
 
 ---
 
@@ -28,7 +28,7 @@ npm run build:page
 
 ## Step 2: Commit and Push
 ```bash
-git add wip/byot.html wip/assets/
+git add ../byot.html ../byot2.html ../assets/ byot.html
 git commit -m "Add built BYOT page"
 git push
 ```
@@ -47,17 +47,18 @@ Since your repo is `caterpillow.github.io`, GitHub Pages should automatically se
 ## Step 4: Wait and View
 
 - Wait 1-2 minutes after pushing for GitHub Pages to update
-- Visit: https://caterpillow.github.io/wip/byot.html
+- Visit: https://caterpillow.github.io/byot
+- The previous `/wip/byot` URL redirects to `/byot`.
+- Legacy versions remain at `/archive/byot/` and `/archive/byot/byot2`.
 
 ## Troubleshooting
 
 **If you get a 404:**
 - Wait a few more minutes (GitHub Pages can take up to 5 minutes)
-- Check that the files are actually in the repo: https://github.com/caterpillow/caterpillow.github.io/tree/main/wip
+- Check that the files are actually in the repo: https://github.com/caterpillow/caterpillow.github.io/tree/main
 - Verify GitHub Pages settings (Step 3)
 
 **If the page loads but assets are broken:**
 - Check browser console for 404 errors
-- Verify `wip/assets/` folder is committed with the files
+- Verify the root `assets/` folder is committed with the files
 - Make sure asset paths in byot.html are relative (they should be `./assets/...`)
-

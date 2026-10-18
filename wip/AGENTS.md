@@ -3,6 +3,8 @@
 - Run commands from `wip/`. `src/codegen/treapConfig.ts` generates GNU C++17; shared dependencies live in `src/codegen/features.ts` and `depsUtil.ts`.
 - Verification: `npm test -- --jobs 6`, `npm run typecheck`, and `npm run test:byot -- --stress-only --sanitize --jobs 4`.
 - Production build without removing existing build artifacts: `node --input-type=module -e 'import { build } from "vite"; await build({ build: { emptyOutDir: false } });'`.
+- The current app is published at `/byot` using root `byot.html` and `assets/`; the source project remains in `wip/`. The publisher also writes redirects from `/wip/byot` to `/byot` and from `/byot2` to `/archive/byot/byot2`.
+- Legacy standalone pages live at `archive/byot/index.html` and `archive/byot/byot2.html`. Keep them out of the publish output and retain `wip/assets/` for cached pages.
 - Do not run `build:page` or change the checked-in publishing HTML/assets unless publication is requested.
 - For publication, build to a fresh temporary directory and pass its absolute path as `BYOT_DIST_DIR` when running `node build-page.js`. This avoids copying stale local builds. The publisher preserves previous hashed assets by default for cached pages; `--clean-assets` deletes them and requires explicit confirmation.
 - Core benchmarks: `npm run bench:byot -- --cpu=2 --keep`. Use `--quick` for correctness smoke checks, not performance conclusions; `--variants=...` selects comparisons.
