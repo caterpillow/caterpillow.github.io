@@ -11,7 +11,7 @@ export type SectionId = typeof SETTINGS_SECTIONS[number]['id'];
 // Group controls into the four always-visible settings sections.
 export function settingsSection(feature: FeatureMeta): SectionId {
   if (['signature', 'comments', 'template'].includes(feature.key)) return 'style';
-  if (['key_type', 'size_option', 'persistent'].includes(feature.key)) return 'treap';
+  if (['key_type', 'size_option', 'persistent', 'size_type'].includes(feature.key)) return 'treap';
   if (['Pointer/Iterators', 'Wrapper'].includes(feature.section)) return 'treap';
   if (['Value/Aggregates', 'Lazy/Range Ops', 'Treap Beats'].includes(feature.section)) return 'values';
   if (['Style', 'Namespaces & Typedefs'].includes(feature.section)) return 'style';
@@ -169,7 +169,7 @@ export function diffLines(previous: string, current: string): DiffLine[] {
 export type TokenKind = 'text' | 'keyword' | 'type' | 'string' | 'number' | 'comment' | 'preprocessor' | 'function';
 export interface Token { text: string; kind: TokenKind }
 const keywords = new Set('auto class struct template typename using namespace const constexpr static if else while for return new delete nullptr true false operator friend public private protected inline noexcept throw try catch default case switch break continue do sizeof decltype alignas static_assert this virtual override final requires concept volatile unsigned signed'.split(' '));
-const types = new Set('int long double float bool char void short wchar_t size_t ptrdiff_t uintmax_t nullptr_t ll ptr weak_ptr'.split(' '));
+const types = new Set('int long double float bool char void short wchar_t size_t ptrdiff_t uintmax_t nullptr_t __int128 ll ptr weak_ptr'.split(' '));
 
 export function highlightCpp(source: string): Token[][] {
   const lines: Token[][] = [[]];

@@ -14,7 +14,7 @@ try {
     stdin: { contents: 'export * from "./src/uiModel"; export * from "./src/codegen/features"; export * from "./src/codegen/depsUtil";', resolveDir: root, loader: 'ts' },
     bundle: true, platform: 'node', format: 'cjs', outfile: bundle, logLevel: 'silent',
   });
-  const { diffLines, highlightCpp, clampRatio, diffScrollTarget, settingsSection, SETTINGS_SECTIONS, features, partitionGroups, columnCount, createDefaultConfig, setFeature, setAvailableFeature, activateFeature, computeDisabled } = createRequire(import.meta.url)(bundle);
+  const { diffLines, highlightCpp, clampRatio, diffScrollTarget, settingsSection, SETTINGS_SECTIONS, features, partitionGroups, columnCount, createDefaultConfig, setFeature, setAvailableFeature, activateFeature, computeDisabled, isVisible, normalizeConfig } = createRequire(import.meta.url)(bundle);
   const rows = diffLines('a\nx\na\nb', 'a\na\nb');
   assert.deepEqual(rows.map(r => r.kind), ['equal', 'remove', 'equal', 'equal']);
   assert.equal(rows[1].text, 'x');
@@ -67,6 +67,21 @@ try {
     assert(Number.isFinite(clampRatio(NaN, extent)));
   }
   const base = createDefaultConfig();
+  const sizeOption = features.find(feature => feature.key === 'size_type');
+  assert.equal(base.size_type, 'int');
+  assert.equal(sizeOption.subOptionOf, 'persistent');
+  assert.equal(settingsSection(sizeOption), 'treap');
+  assert.equal(isVisible(base, 'size_type'), false);
+  const persistent = setFeature(base, 'persistent', true);
+  assert.equal(isVisible(persistent, 'size_type'), true);
+  for (const type of ['long long', '__int128']) {
+    const selected = setAvailableFeature(persistent, 'size_type', type);
+    assert.equal(selected.size_type, type);
+    assert.equal(normalizeConfig({ size_type: type }).persistent, true);
+    const disabled = setFeature(selected, 'persistent', false);
+    assert.equal(disabled.size_type, 'int');
+    assert.equal(isVisible(disabled, 'size_type'), false);
+  }
   assert.equal(computeDisabled(base).findi_option, true);
   assert.equal(setAvailableFeature(base, 'findi_option', true).findi_option, false);
   const active = activateFeature(base, 'findi_option');

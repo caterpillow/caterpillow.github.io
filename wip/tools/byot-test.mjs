@@ -325,6 +325,7 @@ function buildCompileCases() {
 function buildStressCases() {
   return [
     ...regressionCases(),
+    ...wideSizeCases(),
     ...pointerApiCases(),
     ...wrapperCases(),
     {
@@ -842,6 +843,139 @@ int main() {
 `;
 }
 
+function wideSizeCases() {
+  const cases = [];
+  for (const size_type of ['long long', '__int128']) {
+    const bits = size_type === '__int128' ? 80 : 40;
+    cases.push({
+      name: `wide-size-limit-${size_type === '__int128' ? '128' : '64'}`,
+      config: configFor(['findi_option', 'spliti_option'], { persistent: true, array_storage: true, array_storage_size: '1 << 19', size_type }),
+      body: `
+int main() {
+    using S = ${size_type};
+    const S limit = numeric_limits<S>::max();
+    ptr n = nullptr;
+    for (int bit = 0; bit < numeric_limits<S>::digits; ++bit) n = merge(merge(n, n), new Node());
+    if (sz(n) != limit || !findi(n, limit - 1) || findi(n, limit)) fail_test("maximum logical size");
+    auto halves = spliti(n, limit - 2);
+    if (sz(halves.first) != limit - 2 || sz(halves.second) != 2 || sz(merge(halves.first, halves.second)) != limit) fail_test("split/rejoin at size limit");
+    bool rejected = false;
+    try { (void)merge(n, new Node()); } catch (const length_error&) { rejected = true; }
+    if (!rejected || sz(n) != limit) fail_test("size overflow must be rejected");
+    ${size_type === '__int128' ? `
+    for (S bound : {S(1), S(3), (S(3) << 125), limit}) {
+        int upper = 0;
+        for (int i = 0; i < 10000; ++i) {
+            S x = random_below(bound);
+            if (x < 0 || x >= bound) fail_test("128-bit random bounds");
+            upper += x >= bound / 2;
+        }
+        if (bound > 3 && (upper < 4700 || upper > 5300)) fail_test("128-bit draws must cover both halves without modulo bias");
+    }
+    rejected = false;
+    try { (void)random_below(0); } catch (const invalid_argument&) { rejected = true; }
+    if (!rejected) fail_test("zero random bound");
+    ` : ''}
+}
+`,
+    });
+    for (const storage of ['raw', 'augmented', 'array']) {
+      const common = { persistent: true, size_type, augmented_ptr: storage !== 'raw', array_storage: storage === 'array', array_storage_size: '1 << 19' };
+      cases.push({
+        name: `wide-size-empty-${size_type === '__int128' ? '128' : '64'}-${storage}`,
+        config: configFor(['findi_option', 'spliti_option', 'partition_index'], common),
+        body: `
+int main() {
+    using S = ${size_type};
+    static_assert(is_same_v<decltype(Node{}.sz), S>);
+    static_assert(is_same_v<decltype(sz(ptr{})), S>);
+    ptr n = new Node();
+    for (int bit = 0; bit < ${bits}; ++bit) n = merge(n, n);
+    const S length = S(1) << ${bits};
+    if (sz(n) != length || !findi(n, length - 1) || findi(n, length)) fail_test("wide empty-value size/index");
+    auto predicate = [](ptr) { return true; };
+    static_assert(is_same_v<decltype(partition_index(n, predicate)), S>);
+    if (partition_index(n, predicate) != length) fail_test("wide partition sentinel");
+    auto halves = spliti(n, length - 3);
+    if (sz(halves.first) != length - 3 || sz(halves.second) != 3 || sz(n) != length) fail_test("wide empty-value split");
+    ptr restored = merge(halves.first, halves.second);
+    if (sz(restored) != length) fail_test("wide empty-value merge");
+}
+`,
+      });
+      for (const range_type of ['inc exc', 'inc inc']) {
+        const end = expression => range_type === 'inc inc' ? `(${expression}) - 1` : expression;
+        cases.push({
+          name: `wide-size-values-${size_type === '__int128' ? '128' : '64'}-${storage}-${range_type.replace(' ', '-')}`,
+          config: configFor(['range_sum', 'range_min', 'range_max', 'key_sum', 'key_add', 'range_add', 'range_set', 'range_update_index', 'range_query_index', 'range_reverse_index', 'rot_option', 'insi_option', 'deli_option', 'modi_option', 'findi_option', 'three_spliti_option', 'partition_index', 'cumulative_partition_index', 'build_option'], {
+            ...common, range_type, key_type: 'long long', val_type: 'long long', subscript: storage === 'raw' ? 'none' : 'index',
+          }),
+          body: `
+int main() {
+    using S = ${size_type};
+    static_assert(is_same_v<decltype(Node{}.sz), S>);
+    static_assert(is_same_v<decltype(Value{}.sum), S>);
+    static_assert(is_same_v<decltype(Value{}.ksum), S>);
+    static_assert(is_same_v<decltype(&build), ptr (*)(vector<ptr>&, S, S)>);
+    const S length = S(1) << ${bits}, at = length - 9;
+    ptr original = new Node(3, Value::make(1));
+    for (int bit = 0; bit < ${bits}; ++bit) original = merge(original, original);
+    if (sz(original) != length || agg(original).sum != length || agg(original).ksum != 3 * length) fail_test("wide logical aggregates");
+    if (Value::make(1, length).sum != length) fail_test("wide Value factory length");
+    if (!findi(original, at) || findi(original, at)->val.sum != 1) fail_test("wide findi");
+    ptr changed = original;
+    Lazy add = lid; add.val = 2;
+    updi(changed, at, ${end('at + 4')}, add);
+    modifyi(changed, at + 1, [](ptr n) { n->val = Value::make(7); n->val.ksum = n->key; });
+    if (queryi(changed, at, ${end('at + 4')}).sum != 16 || agg(changed).sum != length + 12) fail_test("wide update/modify/query");
+    if (agg(original).sum != length || findi(original, at + 1)->val.sum != 1) fail_test("wide snapshot changed");
+    reversei(changed, at, ${end('at + 4')});
+    if (findi(changed, at + 2)->val.sum != 7) fail_test("wide reverse");
+    rotate(changed, at);
+    if (findi(changed, 2)->val.sum != 7 || sz(changed) != length) fail_test("wide rotation");
+    ptr inserted = original;
+    insi(inserted, new Node(3, Value::make(99)), at);
+    if (sz(inserted) != length + 1 || findi(inserted, at)->val.sum != 99) fail_test("wide insertion");
+    ptr removed = deli(inserted, at);
+    if (!removed || sz(removed) != 1 || removed->val.sum != 99 || sz(inserted) != length || agg(inserted).sum != length) fail_test("wide deletion");
+    auto [left, middle, right] = spliti(original, at, ${end('at + 4')});
+    if (sz(left) != at || sz(middle) != 4 || sz(right) != 5 || sz(original) != length) fail_test("wide three-way split");
+    ptr restored = merge(left, merge(middle, right));
+    if (sz(restored) != length || agg(restored).sum != length) fail_test("wide rejoin");
+    ptr marked = original;
+    modifyi(marked, length - 1, [](ptr n) { n->val = Value::make(7); n->val.ksum = n->key; });
+    auto value_predicate = [](ptr n) { return n->val.sum == 1; };
+    auto prefix_predicate = [=](Value v) { return v.sum <= length - 1; };
+    static_assert(is_same_v<decltype(partition_index(marked, value_predicate)), S>);
+    static_assert(is_same_v<decltype(cumulative_partition_index(marked, prefix_predicate)), S>);
+    if (partition_index(marked, value_predicate) != length - 1 || cumulative_partition_index(marked, prefix_predicate) != length - 1) fail_test("wide partition indices");
+    ptr full = original;
+    updi(full, 0, numeric_limits<S>::max(), add);
+    if (queryi(full, 0, numeric_limits<S>::max()).sum != 3 * length) fail_test("wide full-range clamp");
+    Lazy set = lid; set.inc = false; set.val = 2;
+    updi(full, 0, numeric_limits<S>::max(), set);
+    if (agg(full).sum != 2 * length || agg(full).mn != 2 || agg(full).mx != 2) fail_test("wide lazy length");
+    Lazy key = lid; key.kval = 1;
+    updi(full, 0, numeric_limits<S>::max(), key);
+    if (agg(full).ksum != 4 * length || agg(original).ksum != 3 * length) fail_test("wide lazy key sum");
+    if (queryi(full, -10, -1).sum != 0) fail_test("wide empty-range clamp");
+    vector<ptr> nodes{ptr(new Node(1, Value::make(2))), ptr(new Node(2, Value::make(3)))};
+    if (agg(build(nodes, S(0), S(1))).sum != 5) fail_test("wide build indices");
+    ${storage === 'raw' ? '' : `
+    const ptr& c = marked;
+    if (!c[length - 1] || c[length - 1]->val.sum != 7) fail_test("wide pointer index");
+    if (c[-1] || c[length] || c[static_cast<unsigned __int128>(1) << 127] || c[numeric_limits<S>::lowest()]) fail_test("wide pointer index bounds");
+    if (!c[static_cast<unsigned __int128>(length - 1)] || c[static_cast<unsigned __int128>(length - 1)]->val.sum != 7) fail_test("unsigned wide pointer index");
+    `}
+}
+`,
+        });
+      }
+    }
+  }
+  return cases;
+}
+
 function configFor(keys, overrides = {}) {
   return derive({ ...overrides, ...Object.fromEntries(keys.map(key => [key, true])) });
 }
@@ -923,6 +1057,21 @@ function pairwiseCompileCases() {
   }
   for (const feature of features.filter(f => f.type === "select")) {
     for (const option of feature.options) variants.push({ name: `${feature.key}=${option.value}`, cfg: configFor(["ins_option", "range_query_index", "range_sum"], { [feature.key]: option.value }) });
+  }
+  for (const size_type of ['long long', '__int128']) {
+    for (let i = 0; i < keys.length; ++i) {
+      try {
+        const cfg = configFor([keys[i]], {
+          size_type, key_type: i % 3 === 0 ? 'T' : 'long long', val_type: i % 2 ? 'int' : 'long long',
+          range_type: i % 2 ? 'inc inc' : 'inc exc', array_storage: i % 2 === 0,
+          augmented_ptr: i % 3 === 0, use_namespace_std: i % 4 < 2, use_ll_typedef: i % 3 === 1,
+          namespace_treap: i % 5 === 0,
+        });
+        variants.push({ name: `${size_type}+${keys[i]}`, cfg });
+      } catch (error) {
+        if (!/Incompatible treap features/.test(error.message)) throw error;
+      }
+    }
   }
   const cases = [];
   for (let start = 0; start < variants.length; start += 32) {

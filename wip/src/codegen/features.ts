@@ -17,6 +17,11 @@ export const features: FeatureMeta[] = [
   { key: "comments", label: "Include comments", section: "Misc", tooltip: "Include explanatory algorithm comments. Short container split/merge ownership contracts are always emitted." },
   { key: "template", label: "Include template (for testing)", section: "Misc" },
   { key: "persistent", label: "Persistent treap", section: "Misc", tooltip: "Keeps old versions valid by cloning before mutation. Requires randomized size merge and excludes parent pointers/iterators because shared nodes cannot have version-specific parents. Array storage is recommended for faster persistent allocation." },
+  { key: "size_type", label: "Size and index type", section: "Misc", type: "select", subOptionOf: "persistent", tooltip: "Logical subtree sizes and index APIs can exceed the number of allocated nodes when versions share subtrees. __int128 uses GNU C++17 and also widens sums and numeric key sums; node-arena indices remain int. Sizes and aggregates must fit their selected types.", options: [
+    { value: "int", label: "int (32-bit)" },
+    { value: "long long", label: "long long (64-bit)" },
+    { value: "__int128", label: "__int128 (128-bit)" },
+  ] },
   // Namespaces & Typedefs
   { key: "use_namespace_std", label: "Use namespace std", section: "Namespaces & Typedefs" },
   { key: "use_ll_typedef", label: "Use ll = long long", section: "Namespaces & Typedefs" },
@@ -163,6 +168,7 @@ export const edges: Array<[string, string]> = [
   ["size_biased_merge", "merge_option"],
   ["size_biased_merge", "size_option"],
   ["persistent", "size_biased_merge"],
+  ["size_type", "persistent"],
   ["n_merge_option", "merge_option"],
   ["n_merge_option", "namespace_treap"],
   ["range_add", "lazy_prop"],

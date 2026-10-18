@@ -36,6 +36,28 @@ function valueType(cfg: TreapConfig) {
   return cfg.val_type === 'int' ? 'int' : 'long long';
 }
 
+function sizeType(cfg: TreapConfig) {
+  return cfg.persistent && (cfg.size_type === 'long long' || cfg.size_type === '__int128') ? cfg.size_type : 'int';
+}
+
+function aggregateType(cfg: TreapConfig) {
+  return sizeType(cfg) === '__int128' ? '__int128' : 'long long';
+}
+
+function indexConstraint(cfg: TreapConfig) {
+  return 'std::is_integral_v<Index>' + (sizeType(cfg) === 'int' ? '' : ' || std::is_same_v<Index, __int128> || std::is_same_v<Index, unsigned __int128>');
+}
+
+function chooseLeft(cfg: TreapConfig) {
+  return sizeType(cfg) === '__int128'
+    ? 'random_below(sz(l) + sz(r)) < sz(l)'
+    : `std::uniform_int_distribution<${sizeType(cfg)}>(1, sz(l) + sz(r))(mt) <= sz(l)`;
+}
+
+function checkMergeSize(cfg: TreapConfig) {
+  return sizeType(cfg) === 'int' ? '' : `    if (sz(l) > std::numeric_limits<${sizeType(cfg)}>::max() - sz(r)) throw std::length_error("Treap size exceeds its size type");\n`;
+}
+
 function upperSplit(cfg: TreapConfig, tree: string, key: string) {
   return `${cfg.range_type === 'inc exc' ? 'split' : 'split_le'}(${tree}, ${key})`;
 }
@@ -154,7 +176,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
         s += `    friend ptr &operator+=(ptr &lhs, ptr &&rhs) { return lhs = merge(lhs, rhs); }\n`;
       }
       s += '\n';
-      if (cfg.subscript === 'index') s += '    template<class Index, std::enable_if_t<std::is_integral_v<Index>, int> = 0>\n    ptr operator[](Index i) const;\n';
+      if (cfg.subscript === 'index') s += `    template<class Index, std::enable_if_t<${indexConstraint(cfg)}, int> = 0>\n    ptr operator[](Index i) const;\n`;
       if (cfg.subscript === 'key') s += `    template<class Key, std::enable_if_t<std::is_convertible_v<Key, ${cfg.key_type}>, int> = 0>\n    ptr operator[](Key key)${cfg.subscript_key_mode === 'insert' ? '' : ' const'};\n`;
       s += '    inline ptr begin() const { return mn(*this); }\n';
       s += '    inline ptr end() const { return ptr{nullptr}; }\n';
@@ -207,7 +229,10 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
   },
 
   subscriptFn: (cfg) => {
-    if (cfg.subscript === 'index') return 'template<class Index, std::enable_if_t<std::is_integral_v<Index>, int>>\nptr ptr::operator[](Index i) const {\n    if constexpr (std::is_signed_v<Index>) if (i < 0) return nullptr;\n    if (std::uintmax_t(i) >= std::uintmax_t(sz(*this))) return nullptr;\n    return findi(*this, int(i));\n}\n\n';
+    if (cfg.subscript === 'index') {
+      const unsigned = sizeType(cfg) === 'int' ? 'std::uintmax_t' : 'unsigned __int128';
+      return `template<class Index, std::enable_if_t<${indexConstraint(cfg)}, int>>\nptr ptr::operator[](Index i) const {\n    if constexpr (std::is_signed_v<Index>) if (i < 0) return nullptr;\n    if (static_cast<${unsigned}>(i) >= static_cast<${unsigned}>(sz(*this))) return nullptr;\n    return findi(*this, static_cast<${sizeType(cfg)}>(i));\n}\n\n`;
+    }
     if (cfg.subscript !== 'key') return '';
     const declaration = `template<class Key, std::enable_if_t<std::is_convertible_v<Key, ${cfg.key_type}>, int>>\n`;
     if (cfg.subscript_key_mode !== 'insert') return declaration + `ptr ptr::operator[](Key key) const { return find(*this, static_cast<${cfg.key_type}>(key)); }\n\n`;
@@ -224,10 +249,10 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     let out = '';
     if (cfg.comments) out += '// You can implement your own monoid here for custom operations.\n';
     out += 'struct Value {\n';
-    if (cfg.range_sum || cfg.treap_beats) out += '    long long sum;\n';
+    if (cfg.range_sum || cfg.treap_beats) out += `    ${aggregateType(cfg)} sum;\n`;
     if (cfg.range_max && !cfg.treap_beats) out += `    ${valueType(cfg)} mx;\n`;
     if (cfg.range_min && !cfg.treap_beats) out += `    ${valueType(cfg)} mn;\n`;
-    if (cfg.key_sum) out += `    ${cfg.key_type === 'T' ? 'T' : 'long long'} ksum;\n`;
+    if (cfg.key_sum) out += `    ${cfg.key_type === 'T' ? 'T' : aggregateType(cfg)} ksum;\n`;
     if (cfg.treap_beats && cfg.beats_chmin) out += '    long long mx, mxcnt, mx2;\n';
     if (cfg.treap_beats && cfg.beats_chmax) out += '    long long mn, mncnt, mn2;\n';
     out += '\n';
@@ -246,7 +271,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
       if (cfg.range_max) args.push('x');
       if (cfg.range_min) args.push('x');
       if (cfg.key_sum) args.push('0');
-      out += `    static Value make(${valueType(cfg)} x, long long len = 1) {\n`;
+      out += `    static Value make(${valueType(cfg)} x, ${aggregateType(cfg)} len = 1) {\n`;
       out += `        return {${args.join(', ')}};\n`;
       out += '    }\n\n';
     }
@@ -269,12 +294,12 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
       out += '    bool can_break(const Lazy& lazy) const {\n';
       out += `        return ${breakArgs.join(' && ') || 'true'};\n`;
       out += '    }\n\n';
-      out += '    bool can_tag(const Lazy& lazy, int sz) const {\n';
+      out += `    bool can_tag(const Lazy& lazy, ${sizeType(cfg)} sz) const {\n`;
       out += `        return ${tagArgs.length ? tagArgs.join(' && ') : 'true'};\n`;
       out += '    }\n\n';
     }
     if (cfg.lazy_prop) {
-      out += `    void upd(Lazy lazy${cfg.size_option ? ', int sz' : ''});\n`;
+      out += `    void upd(Lazy lazy${cfg.size_option ? `, ${sizeType(cfg)} sz` : ''});\n`;
       if (cfg.range_agg) out += '\n';
     }
     // Inject valueOps here (operator+)
@@ -387,9 +412,10 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     if (cfg.key_type !== "none" && cfg.key_type !== "int") out += `    ${cfg.key_type} key;\n`;
     const intNames: string[] = [];
     if (cfg.key_type === "int") intNames.push("key");
-    if (cfg.size_option) intNames.push("sz");
+    if (cfg.size_option && sizeType(cfg) === 'int') intNames.push("sz");
     if (!usesSizeBiasedMerge(cfg)) intNames.push("pri");
-    out += `    int ${intNames.join(", ")};\n`;
+    if (intNames.length) out += `    int ${intNames.join(", ")};\n`;
+    if (cfg.size_option && sizeType(cfg) !== 'int') out += `    ${sizeType(cfg)} sz;\n`;
 
     // Pointers
     const ptrNames: string[] = ["l", "r"];
@@ -470,6 +496,22 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     return out;
   },
 
+  sizeRandom: (cfg) => {
+    if (sizeType(cfg) !== '__int128' || !usesSizeBiasedMerge(cfg)) return '';
+    return `__int128 random_below(__int128 bound) {
+    if (bound <= 0) throw std::invalid_argument("Random bound must be positive");
+    using U = unsigned __int128;
+    U limit = static_cast<U>(bound), threshold = (U(0) - limit) % limit, value;
+    do {
+        value = 0;
+        for (int i = 0; i < 4; ++i) value = (value << 32) | mt();
+    } while (value < threshold);
+    return static_cast<__int128>(value % limit);
+}
+
+`;
+  },
+
   persistentHelpers: (cfg) => {
     if (!cfg.persistent) return '';
     let s = '';
@@ -496,8 +538,9 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     s += persistScope(cfg);
     if (cfg.par_option) s += '    if (l) l->par = nullptr;\n    if (r) r->par = nullptr;\n';
     s += '    if (!l || !r) return l ? l : r;\n';
+    s += checkMergeSize(cfg);
     const prepare = (n: string) => `${cfg.persistent ? `clone(${n}), ` : ''}${cfg.push ? `push(${n}), ` : ''}`;
-    const condition = usesSizeBiasedMerge(cfg) ? 'std::uniform_int_distribution<int>(1, sz(l) + sz(r))(mt) <= sz(l)' : 'l->pri > r->pri';
+    const condition = usesSizeBiasedMerge(cfg) ? chooseLeft(cfg) : 'l->pri > r->pri';
     s += `    if (${condition})\n        return ${prepare('l')}l->r = merge(l->r, r), ${h.pull('l')};\n`;
     s += `    else\n        return ${prepare('r')}r->l = merge(l, r->l), ${h.pull('r')};\n`;
     s += '}\n\n';
@@ -599,7 +642,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
   findiFn: (cfg) => {
     if (!cfg.findi_option) return '';
     let out = '';
-    out += 'ptr findi(ptr n, int i) {\n';
+    out += `ptr findi(ptr n, ${sizeType(cfg)} i) {\n`;
     out += '    if (!n) return nullptr;\n';
     if (cfg.persistent && cfg.push) {
       out += persistScope(cfg);
@@ -655,7 +698,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     if (!cfg.insi_option) return '';
     let out = '';
     if (cfg.comments) out += '// inserts node such that it will be at index i. only insert single nodes\n';
-    out += 'void insi(ptr& n, ptr it, int i) {\n';
+    out += `void insi(ptr& n, ptr it, ${sizeType(cfg)} i) {\n`;
     out += persistScope(cfg);
     out += '    if (!n) { n = it; return; }\n';
     if (cfg.persistent) out += '    clone(n);\n';
@@ -677,7 +720,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     if (!cfg.deli_option) return '';
     let out = '';
     if (cfg.comments) out += '// returns pointer to deleted node\n';
-    out += 'ptr deli(ptr& n, int i) {\n';
+    out += `ptr deli(ptr& n, ${sizeType(cfg)} i) {\n`;
     out += persistScope(cfg);
     out += '    if (!n) return nullptr;\n';
     if (cfg.persistent) out += '    clone(n);\n';
@@ -696,7 +739,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     const incExc = cfg.range_type === 'inc exc';
     let out = '';
     if (cfg.comments) out += `// cuts out [lo, hi${incExc ? ')' : ']'}\n`;
-    out += 'std::tuple<ptr, ptr, ptr> spliti(ptr n, int lo, int hi) {\n';
+    out += `std::tuple<ptr, ptr, ptr> spliti(ptr n, ${sizeType(cfg)} lo, ${sizeType(cfg)} hi) {\n`;
     out += `    auto [lm, r] = spliti(n, ${upperIndex(cfg, 'n', 'hi')});\n`;
     out += '    auto [l, m] = spliti(lm, lo);\n';
     out += '    return {l, m, r};\n';
@@ -708,7 +751,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     const h = helpers(cfg);
     let out = '';
     if (cfg.comments) out += '// (-inf, i) and [i, inf)\n';
-    out += 'void spliti(ptr n, int i, ptr &l, ptr &r) {\n';
+    out += `void spliti(ptr n, ${sizeType(cfg)} i, ptr &l, ptr &r) {\n`;
     out += persistScope(cfg);
     out += '    if (!n) { l = r = nullptr; return; }\n';
     if (cfg.persistent) out += '    clone(n);\n';
@@ -717,7 +760,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     out += `    else spliti(n->r, i - 1 - sz(n->l), n->r, r), ${h.pull('l = n')};\n`;
     if (cfg.par_option) out += '    if (l) l->par = nullptr;\n    if (r) r->par = nullptr;\n';
     out += '}\n\n';
-    out += 'std::pair<ptr, ptr> spliti(ptr n, int i) { ptr l, r; spliti(n, i, l, r); return {l, r}; }\n\n';
+    out += `std::pair<ptr, ptr> spliti(ptr n, ${sizeType(cfg)} i) { ptr l, r; spliti(n, i, l, r); return {l, r}; }\n\n`;
     return out;
   },
   modFn: (cfg) => {
@@ -743,7 +786,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     let out = '';
     if (cfg.comments) out += '// performs an arbitrary operation on some node\n';
     out += 'template <typename Op>\n';
-    out += `void modifyi(ptr${cfg.persistent ? '&' : ''} n, int i, Op op) {\n`;
+    out += `void modifyi(ptr${cfg.persistent ? '&' : ''} n, ${sizeType(cfg)} i, Op op) {\n`;
     out += persistScope(cfg);
     out += '    if (!n) return;\n';
     if (cfg.persistent) out += '    clone(n);\n';
@@ -812,7 +855,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     if (!cfg.partition_index) return '';
     let out = '';
     if (cfg.comments) out += '// find smallest index such that pred returns false\n';
-    out += 'template<typename Pred>\nint partition_index(ptr n, Pred pred) {\n';
+    out += `template<typename Pred>\n${sizeType(cfg)} partition_index(ptr n, Pred pred) {\n`;
     out += '    if (!n) return 0;\n';
     if (cfg.persistent && cfg.lazy_prop) {
       out += persistScope(cfg);
@@ -855,7 +898,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
       out += '// find the index of the first prefix aggregate that makes the predicate false (sz(n) if always true)\n';
       out += '// eg. find the smallest prefix that has sum > x\n';
     }
-    out += 'template <typename Pred>\nint cumulative_partition_index(ptr n, Pred pred, Value acc = vid) {\n';
+    out += `template <typename Pred>\n${sizeType(cfg)} cumulative_partition_index(ptr n, Pred pred, Value acc = vid) {\n`;
     out += '    if (!n) return 0;\n';
     if (cfg.persistent && cfg.lazy_prop) {
       out += persistScope(cfg);
@@ -893,9 +936,10 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     out += 'ptr unite_fast(ptr l, ptr r) {\n';
     out += persistScope(cfg);
     out += '    if (!l || !r) return l ? l : r;\n';
+    out += checkMergeSize(cfg);
     if (cfg.persistent) out += '    clone(l), clone(r);\n';
     if (cfg.lazy_prop) out += '    push(l), push(r);\n';
-    if (usesSizeBiasedMerge(cfg)) out += '    if (std::uniform_int_distribution<int>(1, sz(l) + sz(r))(mt) > sz(l)) std::swap(l, r);\n';
+    if (usesSizeBiasedMerge(cfg)) out += `    if (!(${chooseLeft(cfg)})) std::swap(l, r);\n`;
     else out += '    if (l->pri < r->pri) std::swap(l, r);\n';
     out += '    auto [lhs, rhs] = split(r, l->key);\n';
     out += '    l->l = unite_fast(l->l, lhs);\n';
@@ -924,11 +968,11 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
   buildFn: (cfg) => {
     if (!cfg.build_option) return '';
     let out = '';
-    out += 'ptr build(std::vector<ptr>& ns, int l = 0, int r = -69) {\n';
+    out += `ptr build(std::vector<ptr>& ns, ${sizeType(cfg)} l = 0, ${sizeType(cfg)} r = -69) {\n`;
     out += persistScope(cfg);
-    out += '    if (r == -69) r = (int) ns.size() - 1;\n';
+    out += `    if (r == -69) r = static_cast<${sizeType(cfg)}>(ns.size()) - 1;\n`;
     out += '    if (l > r) return nullptr;\n';
-    out += '    int m = l + (r - l) / 2;\n';
+    out += `    ${sizeType(cfg)} m = l + (r - l) / 2;\n`;
     out += '    ptr n = ns[m];\n';
     if (cfg.persistent) out += '    clone(n);\n';
     if (cfg.push) out += '    push(n);\n';
@@ -1005,7 +1049,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     const incExc = cfg.range_type === 'inc exc';
     let s = '';
     if (cfg.comments) s += '// you CANNOT use the normal range update for range reverses\n';
-    s += 'void reversei(ptr& n, int lo, int hi) {\n';
+    s += `void reversei(ptr& n, ${sizeType(cfg)} lo, ${sizeType(cfg)} hi) {\n`;
     s += persistScope(cfg);
     s += `    auto [lm, r] = spliti(n, ${upperIndex(cfg, 'n', 'hi')});\n`;
     s += '    auto [l, m] = spliti(lm, lo);\n';
@@ -1047,9 +1091,9 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     const incExc = cfg.range_type === 'inc exc';
     const fn = incExc ? 'updi' : 'updi_impl';
     let s = '';
-    s += `void ${fn}(ptr${cfg.persistent ? '&' : ''} n, int lo, int hi, Lazy lazy) {\n`;
+    s += `void ${fn}(ptr${cfg.persistent ? '&' : ''} n, ${sizeType(cfg)} lo, ${sizeType(cfg)} hi, Lazy lazy) {\n`;
     s += persistScope(cfg);
-    s += '    lo = std::max(lo, 0), hi = std::min(hi, sz(n));\n';
+    s += `    lo = std::max<${sizeType(cfg)}>(lo, 0), hi = std::min(hi, sz(n));\n`;
     s += '    if (!n || lo >= hi || lazy.empty()) return;\n';
     if (cfg.range_reverse_key || cfg.range_reverse_index) s += '    if (lazy.rev) throw std::invalid_argument("Use reverse/reversei for range reversal");\n';
     if (cfg.treap_beats) s += '    if (n->agg.can_break(lazy)) return;\n';
@@ -1071,7 +1115,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     s += '    pull(n);\n';
     s += '}\n\n';
     if (!incExc) {
-      s += `void updi(ptr${cfg.persistent ? '&' : ''} n, int lo, int hi, Lazy lazy) {\n`;
+      s += `void updi(ptr${cfg.persistent ? '&' : ''} n, ${sizeType(cfg)} lo, ${sizeType(cfg)} hi, Lazy lazy) {\n`;
       s += persistScope(cfg);
       s += `    updi_impl(n, lo, ${upperIndex(cfg, 'n', 'hi')}, lazy);\n`;
       s += '}\n\n';
@@ -1098,9 +1142,9 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     const incExc = cfg.range_type === 'inc exc';
     const fn = incExc ? 'queryi' : 'queryi_impl';
     let s = '';
-    s += `Value ${fn}(ptr n, int lo, int hi) {\n`;
+    s += `Value ${fn}(ptr n, ${sizeType(cfg)} lo, ${sizeType(cfg)} hi) {\n`;
     if (cfg.persistent && cfg.push) s += persistScope(cfg);
-    s += '    lo = std::max(lo, 0), hi = std::min(hi, sz(n));\n';
+    s += `    lo = std::max<${sizeType(cfg)}>(lo, 0), hi = std::min(hi, sz(n));\n`;
     s += '    if (!n || lo >= hi) return vid;\n';
     s += '    if (lo <= 0 && sz(n) <= hi) return n->agg;\n';
     if (cfg.persistent && cfg.push) s += '    clone(n);\n';
@@ -1108,7 +1152,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     s += `    return ${fn}(n->l, lo, hi) + (lo <= sz(n->l) && sz(n->l) < hi ? n->val : vid) + ${fn}(n->r, lo - 1 - sz(n->l), hi - 1 - sz(n->l));\n`;
     s += '}\n\n';
     if (!incExc) {
-      s += 'Value queryi(ptr n, int lo, int hi) {\n';
+      s += `Value queryi(ptr n, ${sizeType(cfg)} lo, ${sizeType(cfg)} hi) {\n`;
       if (cfg.persistent && cfg.push) s += persistScope(cfg);
       s += `    return queryi_impl(n, lo, ${upperIndex(cfg, 'n', 'hi')});\n`;
       s += '}\n\n';
@@ -1118,7 +1162,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
   // size helper
   szFn: (cfg) => {
     if (!cfg.size_option) return '';
-    return 'int sz(ptr n) { return n ? n->sz : 0; }\n\n';
+    return `${sizeType(cfg)} sz(ptr n) { return n ? n->sz : 0; }\n\n`;
   },
   // agg accessor helper
   aggFn: (cfg) => {
@@ -1182,7 +1226,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
   valueUpd: (cfg) => {
     if (!cfg.enable_value || !cfg.lazy_prop) return '';
     let s = '';
-    s += `void Value::upd(Lazy lazy${cfg.size_option ? ', int sz' : ''}) {\n`;
+    s += `void Value::upd(Lazy lazy${cfg.size_option ? `, ${sizeType(cfg)} sz` : ''}) {\n`;
     if (cfg.treap_beats) {
       // Beats adjustments
       if (cfg.beats_add) {
@@ -1262,7 +1306,7 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
     if (!cfg.rot_option) return '';
     let s = '';
     if (cfg.comments) s += '// rotates treap such that index i is at the start\n';
-    s += 'void rotate(ptr& n, int i) {\n';
+    s += `void rotate(ptr& n, ${sizeType(cfg)} i) {\n`;
     s += persistScope(cfg);
     s += '    auto [l, r] = spliti(n, i);\n';
     s += '    n = merge(r, l);\n';
@@ -1284,13 +1328,13 @@ const fragments: {[key: string]: (cfg: TreapConfig) => string} = {
   orderFn: (cfg) => {
     if (!cfg.order_option) return '';
     let s = '';
-    s += 'int _order(ptr n, ptr from) {\n';
+    s += `${sizeType(cfg)} _order(ptr n, ptr from) {\n`;
     s += '    if (!n) return -1;\n';
-    s += '    int res = _order(n->par, n);\n';
+    s += `    ${sizeType(cfg)} res = _order(n->par, n);\n`;
     s += '    if (from == n->r || !from) res += sz(n->l) + 1;\n';
     s += '    return res;\n';
     s += '}\n\n';
-    s += `int order(ptr n) { ${cfg.push ? 'clean(n); ' : ''}return _order(n, nullptr); }\n\n`;
+    s += `${sizeType(cfg)} order(ptr n) { ${cfg.push ? 'clean(n); ' : ''}return _order(n, nullptr); }\n\n`;
     return s;
   },
   // root of a node via parent pointers
@@ -1312,7 +1356,7 @@ const ORDER = [
   'forwardDecls', 'ptrType', 'weakPtrType', 'partitionConst',
   'lazyStruct', 'valueStruct',
   'vidConst', 'lidConst', 'beatsTagHelpers',
-  'nodeStruct',
+  'nodeStruct', 'sizeRandom',
   'persistentHelpers',
   'valueUpd',
   'szFn', 'aggFn',
